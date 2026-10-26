@@ -1,42 +1,7 @@
-import { CheckCircleIcon, CubeTransparentIcon } from '@heroicons/react/24/outline';
-import { Link, Route, Routes } from 'react-router';
-import { toast } from 'sonner';
+import { CubeTransparentIcon } from '@heroicons/react/24/outline';
+import { Link, Outlet, Route, Routes } from 'react-router';
 import { Button } from './components/ui/button';
-
-function Welcome() {
-  return (
-    <section aria-labelledby="welcome-title" className="space-y-6">
-      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-        <CheckCircleIcon aria-hidden="true" className="h-5 w-5" /> Lingkungan frontend
-      </div>
-      <h1 id="welcome-title" className="text-3xl font-bold tracking-tight sm:text-4xl">
-        Frontend STAS-RG siap
-      </h1>
-      <p className="max-w-2xl leading-7 text-slate-600">
-        Kerangka React, Vite, TypeScript, Refine dan Tailwind berjalan langsung di Windows. Mulai
-        pengembangan dari workspace ini tanpa Docker.
-      </p>
-      <ul className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2">
-        <li>React 19 dan TypeScript strict</li>
-        <li>Refine 5 dan React Router 7</li>
-        <li>Tailwind 4 dan Heroicons</li>
-        <li>Vitest dan Playwright</li>
-      </ul>
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={() => toast.success('Notifikasi frontend bekerja.')}>
-          Uji notifikasi
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/tentang">Tentang workspace</Link>
-        </Button>
-      </div>
-      <p className="text-sm leading-6 text-slate-600">
-        Ini halaman pemeriksaan awal. Login, pengajuan dan data produksi belum dihubungkan ke
-        backend.
-      </p>
-    </section>
-  );
-}
+import { LoginPage } from './features/auth/login-page';
 
 function About() {
   return (
@@ -68,7 +33,7 @@ function NotFound() {
   );
 }
 
-export function App() {
+function WorkspaceLayout() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <a
@@ -92,12 +57,20 @@ export function App() {
         </div>
       </header>
       <main id="konten" className="mx-auto max-w-4xl px-6 py-12 sm:py-16">
-        <Routes>
-          <Route path="/" element={<Welcome />} />
-          <Route path="/tentang" element={<About />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Outlet />
       </main>
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LoginPage />} />
+      <Route element={<WorkspaceLayout />}>
+        <Route path="/tentang" element={<About />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
 }

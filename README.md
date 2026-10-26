@@ -57,7 +57,7 @@ pnpm.cmd --filter @stas/web exec playwright install chromium
 - Heroicons, Sonner, Recharts, Day Picker, font lokal, Decimal dan date utilities.
 - Radix Slot dan fondasi Button copy-in dengan konfigurasi CLI shadcn yang dipin.
 - ESLint, Prettier, Vitest/Testing Library, MSW, Playwright/axe dan Turborepo.
-- Halaman starter untuk memeriksa navigasi dan notifikasi; bukan fitur procurement lengkap.
+- Halaman login responsif sesuai visual-references/login.png, dengan validasi form dan tombol tampilkan password.
 
 Versi dependency dan integrity tercatat di pnpm-lock.yaml; patch dan override berada di patches/ dan pnpm-workspace.yaml. Catatan baseline tambahan tersedia secara lokal di docs/dependency-baseline.json, yang dikecualikan dari Git. Paket pendamping yang tidak dipin spesifikasi dipilih setelah pemeriksaan metadata dan kecocokan Node/peer.
 
@@ -69,7 +69,13 @@ Lihat apps/web/.env.example. Berkas lokal apps/web/.env.local tidak masuk Git.
 - VITE_ENABLE_MOCKS default false; MSW hanya boleh dimulai pada mode development.
 - Jangan simpan password, BETTER_AUTH_SECRET, credential database/S3, atau key enkripsi pada VITE_*.
 
-MSW menyediakan contoh endpoint tiruan /api/v1/setup yang memberi label mock dengan jelas. Login/data produksi tidak dibuat dan tidak dipalsukan.
+MSW menyediakan contoh endpoint tiruan /api/v1/setup yang memberi label mock dengan jelas. Autentikasi dan data produksi belum diimplementasikan.
+
+## Halaman login
+
+URL / menampilkan halaman login. Field identitas menerima ID, NIM, atau email; kedua field wajib diisi. Submit valid menampilkan pesan "Fitur masuk belum tersedia saat ini." tanpa mengirim kredensial, membuat sesi, atau berpindah ke dashboard. Integrasi autentikasi backend akan ditambahkan terpisah.
+
+Pada layar mulai 1024 px, halaman menampilkan form dan panel identitas STAS-RG. Layar lebih kecil menampilkan form saja. Route /tentang dan halaman tidak ditemukan tetap tersedia. Screenshot berbagai ukuran layar disimpan sebagai lampiran laporan Playwright saat menjalankan pnpm.cmd test:e2e.
 
 ## Komponen dan integrasi berikutnya
 
