@@ -639,6 +639,159 @@
   font-weight: 700;
   line-height: 1.4;
 }
+.dialogHeading {
+  min-width: 0;
+  flex: 1;
+}
+.dialogSubtitle {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.dialogHeaderIcon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 17px;
+  background: #d1fae5;
+  color: #007a55;
+}
+.dialogHeaderIcon svg {
+  width: 32px;
+  height: 32px;
+}
+.requestNotice {
+  width: min(612px, calc(100% - 32px));
+  border: 1px solid #e8edf1;
+  border-radius: 22px;
+  box-shadow: 0 28px 90px rgb(15 23 42 / 25%);
+}
+.requestNotice::backdrop {
+  background: rgb(15 23 42 / 52%);
+  backdrop-filter: blur(4px);
+}
+.requestNotice .dialogHeader {
+  gap: 16px;
+  border: 0;
+  padding: 28px 28px 0;
+}
+.requestNotice .dialogHeader h2 {
+  color: #007a55;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: -0.015em;
+}
+.requestNotice .dialogHeader > button {
+  margin-right: -4px;
+  color: #73849d;
+}
+.requestNotice .dialogHeader > button svg {
+  width: 26px;
+  height: 26px;
+}
+.requestNotice .dialogBody {
+  padding: 28px;
+}
+.requestNoticeMessage {
+  border-radius: 18px;
+  padding: 24px;
+  background: #fffbeb;
+  color: #92400e;
+}
+.requestNoticeMessage h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.04em;
+}
+.requestNoticeMessage h3:focus {
+  outline: none;
+}
+.requestNoticeMessage p {
+  margin: 12px 0 0;
+  font-size: 18px;
+  line-height: 1.6;
+}
+.requestNoticeMessage[data-empty='true'] {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.requestNoticeActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+}
+.requestNoticeActions button {
+  min-height: 50px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.requestNoticeActions .secondaryButton {
+  min-width: 176px;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+.requestNoticeActions .primaryButton {
+  background: #007a55;
+  box-shadow: 0 3px 6px rgb(0 122 85 / 12%);
+}
+.requestNoticeActions .primaryButton:hover {
+  background: #006443;
+}
+@media (min-width: 1024px) and (min-height: 640px) {
+  .requestNotice {
+    max-height: calc(100dvh - 88px);
+    transform: translateY(-28px);
+  }
+}
+@media (max-width: 639px) {
+  .requestNotice .dialogHeader {
+    gap: 12px;
+    padding: 20px 20px 0;
+  }
+  .requestNotice .dialogHeader h2 {
+    font-size: 15px;
+  }
+  .requestNotice .dialogBody {
+    padding: 20px;
+  }
+  .requestNotice .dialogHeaderIcon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  .requestNotice .dialogHeaderIcon svg {
+    width: 26px;
+    height: 26px;
+  }
+  .requestNoticeMessage {
+    padding: 20px;
+  }
+  .requestNoticeMessage h3 {
+    font-size: 21px;
+  }
+  .requestNoticeMessage p {
+    font-size: 16px;
+  }
+  .requestNoticeActions {
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .requestNoticeActions button {
+    flex: 1 1 140px;
+    font-size: 15px;
+    padding-inline: 12px;
+  }
+}
 .dialogBody {
   padding: 24px;
 }

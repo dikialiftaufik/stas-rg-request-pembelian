@@ -19,6 +19,7 @@ import { demoAccounts } from '../demo/seed';
 import { ConfirmDialog, PageHeading, Pagination } from './shared';
 import { UserEditor, ResearchEditor } from './editors';
 import { RequestList } from './request-list';
+import { AdminDashboardNotice } from './admin-dashboard-notice';
 import styles from './dashboard.module.css';
 
 export function DashboardPage() {
@@ -87,6 +88,7 @@ export function DashboardPage() {
         ))}
       </section>
       <RequestList recent />
+      {user.role === 'admin' && <AdminDashboardNotice />}
     </>
   );
 }

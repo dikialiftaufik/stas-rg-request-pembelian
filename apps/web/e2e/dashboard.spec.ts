@@ -3,11 +3,20 @@ import ExcelJS from 'exceljs';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+async function acknowledgeAdminNotice(page: Page) {
+  const notice = page.getByRole('alertdialog', { name: 'Pemberitahuan Request' });
+  await expect(notice).toBeVisible();
+  await notice.getByRole('button', { name: 'Nanti saja', exact: true }).click();
+  await expect(notice).toHaveCount(0);
+}
+
 async function signIn(page: Page, role: 'admin' | 'pengaju' = 'admin') {
   await page.goto('/');
   await page.getByLabel('ID / NIM / EMAIL').fill(`${role}@gmail.com`);
   await page.getByLabel('PASSWORD', { exact: true }).fill(`${role}123`);
   await page.getByRole('button', { name: 'Masuk ke Dashboard' }).click();
+  await page.waitForURL('**/dashboard');
+  if (role === 'admin') await acknowledgeAdminNotice(page);
   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard Pengadaan' })).toBeVisible();
 }
 
@@ -26,11 +35,13 @@ test('dashboard Admin sesuai ringkasan dan bertahan setelah refresh', async ({ p
   await expect(page.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ekspor Excel' })).toBeVisible();
   await page.reload();
+  await acknowledgeAdminNotice(page);
   await expect(
     page.getByRole('heading', { name: 'Dashboard Pengadaan', exact: true }),
   ).toBeVisible();
   await page.goto('/');
   await expect(page).toHaveURL('/dashboard');
+  await acknowledgeAdminNotice(page);
   const saved = await page.evaluate(() => sessionStorage.getItem('stas-rg-demo-v1'));
   expect(saved).not.toContain('admin123');
   expect(saved).not.toContain('pengaju123');
@@ -72,6 +83,7 @@ test('detail dialog, fokus, Escape, sidebar, dan notifikasi bekerja', async ({ p
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Notifikasi, 0 belum dibaca' })).toBeVisible();
   await page.reload();
+  await acknowledgeAdminNotice(page);
   await page.getByRole('button', { name: 'Notifikasi, 0 belum dibaca' }).click();
   await page.getByRole('button', { name: 'Buka request', exact: true }).first().click();
   await expect(page.getByRole('dialog', { name: 'Detail Request Pembelian' })).toBeVisible();
@@ -96,6 +108,7 @@ test('Admin dapat mengedit dan menghapus request dengan konfirmasi', async ({ pa
     '23',
   );
   await page.reload();
+  await acknowledgeAdminNotice(page);
   await expect(page.getByRole('cell', { name: 'Oscilloscope Digital', exact: true })).toHaveCount(
     0,
   );

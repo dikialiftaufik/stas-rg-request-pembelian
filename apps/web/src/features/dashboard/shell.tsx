@@ -105,7 +105,9 @@ export function DashboardShell() {
     };
     document.title = `${titles[location.pathname] ?? 'STAS-RG'} | STAS-RG Procurement Portal`;
     window.scrollTo(0, 0);
-    mainRef.current?.focus({ preventScroll: true });
+    if (!document.querySelector('dialog[open]')) {
+      mainRef.current?.focus({ preventScroll: true });
+    }
     return () => {
       document.title = previous;
     };

@@ -105,9 +105,14 @@ describe('akses dashboard demo', () => {
       await screen.findByRole('heading', { level: 1, name: 'Dashboard Pengadaan' }),
     ).toBeVisible();
     expect(window.location.pathname).toBe('/dashboard');
-    if (role === 'admin')
+    if (role === 'admin') {
+      expect(screen.getByRole('alertdialog', { name: 'Pemberitahuan Request' })).toBeVisible();
+      await user.click(screen.getByRole('button', { name: 'Nanti saja' }));
       expect(screen.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
-    else expect(screen.queryByRole('link', { name: 'Manajemen Pengguna' })).not.toBeInTheDocument();
+    } else {
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Manajemen Pengguna' })).not.toBeInTheDocument();
+    }
     await user.click(screen.getByRole('button', { name: 'Keluar' }));
     expect(await screen.findByLabelText('ID / NIM / EMAIL')).toBeVisible();
   });

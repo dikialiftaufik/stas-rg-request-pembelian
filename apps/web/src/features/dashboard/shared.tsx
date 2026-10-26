@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import type { RequestStatus } from '../demo/model';
@@ -11,12 +11,26 @@ export function Modal({
   onClose,
   wide = false,
   drawer = false,
+  closeOnEscape = true,
+  headerIcon,
+  subtitle,
+  className,
+  descriptionId,
+  role = 'dialog',
+  closeLabel = 'Tutup dialog',
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
   drawer?: boolean;
+  closeOnEscape?: boolean;
+  headerIcon?: ReactNode;
+  subtitle?: string;
+  className?: string | undefined;
+  descriptionId?: string;
+  role?: 'dialog' | 'alertdialog';
+  closeLabel?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -24,9 +38,11 @@ export function Modal({
   useEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = ref.current;
     const previous = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     dialog?.showModal();
     const target =
       dialog?.querySelector<HTMLElement>('[data-initial-focus]') ??
@@ -37,26 +53,59 @@ export function Modal({
     target?.focus();
     return () => {
       dialog?.close();
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
-      else document.querySelector<HTMLElement>('main')?.focus();
+      document.body.style.overflow = previousOverflow;
+      if (previous instanceof HTMLElement && previous.isConnected && previous !== document.body) {
+        previous.focus();
+      } else document.querySelector<HTMLElement>('main')?.focus();
     };
   }, []);
   return (
     <dialog
       ref={ref}
+      role={role}
       aria-labelledby={titleId}
-      className={`${styles.dialog} ${wide ? styles.wideDialog : ''} ${drawer ? styles.drawerDialog : ''}`}
+      aria-describedby={descriptionId}
+      className={`${styles.dialog} ${wide ? styles.wideDialog : ''} ${drawer ? styles.drawerDialog : ''} ${className ?? ''}`}
       onCancel={(event) => {
         event.preventDefault();
-        closeRef.current();
+        if (closeOnEscape) closeRef.current();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab') return;
+        const controls = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            'a[href], button, input, select, textarea, [tabindex]',
+          ),
+        ).filter(
+          (element) =>
+            element.tabIndex >= 0 &&
+            !element.matches(':disabled') &&
+            !element.closest('[inert]') &&
+            element.getClientRects().length > 0,
+        );
+        const first = controls[0];
+        const last = controls.at(-1);
+        const active = document.activeElement;
+        if (
+          (event.shiftKey && active === first) ||
+          (!event.shiftKey && active === last) ||
+          !controls.some((element) => element === active)
+        ) {
+          event.preventDefault();
+          (event.shiftKey ? last : first)?.focus();
+        }
       }}
     >
       <header className={styles.dialogHeader}>
-        <h2 id={titleId}>{title}</h2>
+        {headerIcon && <span className={styles.dialogHeaderIcon}>{headerIcon}</span>}
+        <div className={styles.dialogHeading}>
+          <h2 id={titleId}>{title}</h2>
+          {subtitle && <p className={styles.dialogSubtitle}>{subtitle}</p>}
+        </div>
         <button
           className={styles.iconButton}
           type="button"
-          aria-label="Tutup dialog"
+          aria-label={closeLabel}
           onClick={onClose}
         >
           <XMarkIcon aria-hidden="true" />
