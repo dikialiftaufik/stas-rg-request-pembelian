@@ -1,0 +1,16 @@
+node_modules/
+dist/
+docs/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.local
+*.tsbuildinfo
+Desktop.ini
+desktop.ini
+Thumbs.db
+.DS_Store

@@ -1,0 +1,25 @@
+{
+  "name": "stas-rg-request-pembelian",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": "24.22.1"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @stas/web dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:unit": "turbo run test:unit",
+    "test:coverage": "turbo run test:coverage",
+    "test:e2e": "pnpm build && pnpm --filter @stas/web test:e2e",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build"
+  },
+  "devDependencies": {
+    "turbo": "2.11.10",
+    "prettier": "3.9.10"
+  }
+}
