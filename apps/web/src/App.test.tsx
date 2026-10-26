@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
 import { AppProviders } from './providers';
+import { loginDemo } from './features/demo/store';
 
 function renderApp() {
   return render(
@@ -73,21 +74,56 @@ describe('halaman login', () => {
   });
 
   it.each(['STAS-001', '2026123456', 'peneliti@example.com'])(
-    'menerima identitas %s dan memberi pesan tanpa mengarahkan ke dashboard',
+    'menolak identitas yang tidak terdaftar: %s',
     async (identifier) => {
       const user = userEvent.setup();
       renderApp();
       await user.type(screen.getByLabelText('ID / NIM / EMAIL'), identifier);
       await user.type(screen.getByLabelText('PASSWORD'), ' password ');
       await user.keyboard('{Enter}');
-      expect(await screen.findByText('Fitur masuk belum tersedia saat ini.')).toBeVisible();
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(await screen.findByText('Email atau password salah.')).toBeVisible();
       expect(window.location.pathname).toBe('/');
       expect(screen.getByLabelText('PASSWORD')).toHaveValue(' password ');
       await user.type(screen.getByLabelText('ID / NIM / EMAIL'), '2');
       expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      expect(screen.queryByText('Email atau password salah.')).not.toBeInTheDocument();
     },
   );
+});
+
+describe('akses dashboard demo', () => {
+  it.each([
+    ['admin', 'admin@gmail.com', 'admin123'],
+    ['pengaju', 'pengaju@gmail.com', 'pengaju123'],
+  ])('membuka dashboard untuk %s', async (role, email, password) => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.type(screen.getByLabelText('ID / NIM / EMAIL'), email);
+    await user.type(screen.getByLabelText('PASSWORD'), password);
+    await user.click(screen.getByRole('button', { name: 'Masuk ke Dashboard' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Dashboard Pengadaan' }),
+    ).toBeVisible();
+    expect(window.location.pathname).toBe('/dashboard');
+    if (role === 'admin')
+      expect(screen.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
+    else expect(screen.queryByRole('link', { name: 'Manajemen Pengguna' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Keluar' }));
+    expect(await screen.findByLabelText('ID / NIM / EMAIL')).toBeVisible();
+  });
+  it('mengarahkan tamu dari dashboard ke login', () => {
+    window.history.replaceState({}, '', '/dashboard');
+    renderApp();
+    expect(screen.getByLabelText('ID / NIM / EMAIL')).toBeVisible();
+    expect(window.location.pathname).toBe('/');
+  });
+  it('menolak akses langsung Pengaju ke manajemen pengguna', () => {
+    loginDemo('pengaju@gmail.com', 'pengaju123');
+    window.history.replaceState({}, '', '/users');
+    renderApp();
+    expect(screen.getByRole('heading', { name: 'Akses ditolak' })).toBeVisible();
+    expect(screen.queryByText('hasan@example.test')).not.toBeInTheDocument();
+  });
 });
 
 describe('rute workspace', () => {

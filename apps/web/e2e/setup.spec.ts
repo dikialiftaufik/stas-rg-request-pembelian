@@ -34,14 +34,12 @@ test('login dapat digunakan dengan keyboard tanpa autentikasi palsu', async ({ p
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Masuk ke Dashboard' })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('status')).toHaveText('Fitur masuk belum tersedia saat ini.');
+  await expect(page.getByRole('alert')).toHaveText('Email atau password salah.');
   await expect(page.getByLabel('PASSWORD', { exact: true })).toHaveValue(' password ');
   await expect(page).toHaveURL('/');
   expect(apiRequests).toEqual([]);
   expect(errors).toEqual([]);
-  expect(
-    await page.evaluate(() => [window.localStorage.length, window.sessionStorage.length]),
-  ).toEqual([0, 0]);
+  expect(await page.evaluate(() => window.localStorage.length)).toBe(0);
 });
 
 test('validasi form menjelaskan kesalahan dan memfokuskan input', async ({ page }) => {
@@ -54,7 +52,7 @@ test('validasi form menjelaskan kesalahan dan memfokuskan input', async ({ page 
   await expect(page.getByText('Masukkan ID, NIM, atau email Anda.')).toHaveCount(0);
   await page.getByLabel('PASSWORD', { exact: true }).fill('password');
   await page.getByLabel('PASSWORD', { exact: true }).press('Enter');
-  await expect(page.getByRole('status')).toHaveText('Fitur masuk belum tersedia saat ini.');
+  await expect(page.getByRole('alert')).toHaveText('Email atau password salah.');
 });
 
 test('rute tentang dan halaman tidak ditemukan tetap berfungsi', async ({ page }) => {
@@ -107,7 +105,7 @@ test('form tetap dapat dipakai ketika ukuran teks diperbesar', async ({ page }) 
   await page.getByLabel('ID / NIM / EMAIL').fill('2026123456');
   await page.getByLabel('PASSWORD', { exact: true }).fill('password');
   await page.getByRole('button', { name: 'Masuk ke Dashboard' }).click();
-  await expect(page.getByRole('status')).toHaveText('Fitur masuk belum tersedia saat ini.');
+  await expect(page.getByRole('alert')).toHaveText('Email atau password salah.');
 });
 
 test('login memenuhi pemeriksaan aksesibilitas pada desktop, mobile, dan state error', async ({

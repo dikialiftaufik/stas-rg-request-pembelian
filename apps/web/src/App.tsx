@@ -1,7 +1,9 @@
 import { CubeTransparentIcon } from '@heroicons/react/24/outline';
 import { Link, Outlet, Route, Routes } from 'react-router';
 import { Button } from './components/ui/button';
-import { LoginPage } from './features/auth/login-page';
+import { LoginRoute, SessionGate, AdminGate } from './features/auth/session-routes';
+import { DashboardShell } from './features/dashboard/shell';
+import { DashboardPage, RequestsPage, UsersPage, ResearchPage } from './features/dashboard/pages';
 
 function About() {
   return (
@@ -66,7 +68,17 @@ function WorkspaceLayout() {
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LoginPage />} />
+      <Route path="/" element={<LoginRoute />} />
+      <Route element={<SessionGate />}>
+        <Route element={<DashboardShell />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/requests" element={<RequestsPage />} />
+          <Route element={<AdminGate />}>
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/research-types" element={<ResearchPage />} />
+          </Route>
+        </Route>
+      </Route>
       <Route element={<WorkspaceLayout />}>
         <Route path="/tentang" element={<About />} />
         <Route path="*" element={<NotFound />} />

@@ -71,11 +71,30 @@ Lihat apps/web/.env.example. Berkas lokal apps/web/.env.local tidak masuk Git.
 
 MSW menyediakan contoh endpoint tiruan /api/v1/setup yang memberi label mock dengan jelas. Autentikasi dan data produksi belum diimplementasikan.
 
-## Halaman login
+## Login dan dashboard demo
 
-URL / menampilkan halaman login. Field identitas menerima ID, NIM, atau email; kedua field wajib diisi. Submit valid menampilkan pesan "Fitur masuk belum tersedia saat ini." tanpa mengirim kredensial, membuat sesi, atau berpindah ke dashboard. Integrasi autentikasi backend akan ditambahkan terpisah.
+URL / menampilkan halaman login. Dua akun publik berikut tersedia khusus untuk demonstrasi frontend:
+
+| Peran   | Email             | Password   |
+| ------- | ----------------- | ---------- |
+| Admin   | admin@gmail.com   | admin123   |
+| Pengaju | pengaju@gmail.com | pengaju123 |
+
+Email dinormalisasi (trim dan huruf kecil); password harus cocok persis. Login berhasil membuka /dashboard. Kredensial lain ditolak dengan pesan generik. Adapter demo terhubung ke authProvider Refine, tanpa endpoint autentikasi backend.
 
 Pada layar mulai 1024 px, halaman menampilkan form dan panel identitas STAS-RG. Layar lebih kecil menampilkan form saja. Route /tentang dan halaman tidak ditemukan tetap tersedia. Screenshot berbagai ukuran layar disimpan sebagai lampiran laporan Playwright saat menjalankan pnpm.cmd test:e2e.
+
+Admin dapat mencari/filter/sort request, melihat detail, mengedit atau menghapus, mengekspor XLSX, serta mengelola pengguna dan riset. Pengaju hanya melihat miliknya, membuat request, dan membatalkan pengajuan yang masih menunggu persetujuan. Rute /users dan /research-types hanya tersedia untuk Admin. Sidebar, drawer mobile, notifikasi, profil, dan logout dapat digunakan.
+
+Dataset awal memuat 24 request (18 disetujui, 4 menunggu, total Rp125.400.000). Dashboard merangkum data sesuai cakupan peran dan menampilkan lima request terbaru; halaman /requests menyediakan pagination seluruh data yang diizinkan. Semua nominal dihitung dengan Decimal.js. Pemakaian dana riset berasal dari request disetujui dan status sesudahnya; ini simulasi komitmen, bukan ledger pembayaran.
+
+Sesi dan perubahan data disimpan per tab di sessionStorage dengan key stas-rg-demo-v1 dan divalidasi menggunakan Zod. Password tidak disimpan. Refresh mempertahankan data; logout menghapus sesi tetapi mempertahankan data demo untuk pergantian akun dalam tab yang sama. Tutup tab untuk mengakhiri sesi demo. Snapshot rusak direset; penyimpanan yang diblokir browser memakai memori halaman.
+
+Kedua akun login utama tidak dapat dihapus atau diubah email/perannya. CRUD pengguna tambahan tidak membuat kredensial login baru. Pengguna/riset yang masih dirujuk request tidak dapat dihapus. Tanggal kebutuhan baru minimal H-3 hari kerja (Senin–Jumat) dalam Asia/Jakarta dan maksimal 180 hari; daftar hari libur demo kosong.
+
+Ini **simulasi frontend**, bukan autentikasi atau pengamanan data produksi: kode dan data contoh dapat diperiksa di browser. Sebelum menggunakan data nyata, ganti adapter dengan autentikasi dan otorisasi server. Backend, invoice, impor RAB, dan ledger pendanaan belum termasuk cakupan ini.
+
+Ekspor menggunakan exceljs 4.4.0 yang dimuat saat dibutuhkan. Override uuid 11.1.1 khusus ExcelJS menangani [GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq); jalur ExcelJS menggunakan API v4, yang tidak terdampak advisory tersebut. Pertahankan override dan lockfile bersama.
 
 ## Komponen dan integrasi berikutnya
 

@@ -5,6 +5,7 @@ import simpleRestProvider from '@refinedev/simple-rest';
 import { BrowserRouter } from 'react-router';
 import { Toaster } from 'sonner';
 import { clientEnvironment } from './lib/environment';
+import { demoAuthProvider } from './features/auth/demo-auth-provider';
 
 const dataProvider = simpleRestProvider(clientEnvironment.apiBaseUrl);
 
@@ -13,6 +14,7 @@ export function AppProviders({ children }: PropsWithChildren) {
     <BrowserRouter>
       <Refine
         dataProvider={dataProvider}
+        authProvider={demoAuthProvider}
         routerProvider={routerBindings}
         options={{
           disableTelemetry: true,
