@@ -88,6 +88,8 @@ Select, menu, kalender dan dialog memakai komponen registry resmi @shadcn/Radix 
 
 Kolom Pengaju/riset menyusun nama utama dan riset pendukung dalam satu sel; menu header menyediakan A–Z/Z–A untuk keduanya. Badge status menggunakan label tanpa titik dekoratif. Invoice mempunyai kolom tersendiri, Aksi tetap sticky. Ekspor dan impor memakai varian hijau yang sama, dibedakan oleh ikon serta label.
 
+Status pengajuan memakai badge outline untuk Belum diajukan dan hijau untuk Sudah diajukan, dengan label yang tetap jelas tanpa warna. Bagi Admin, badge menjadi pemicu menu radio bertema dengan pilihan tercentang, dukungan keyboard, Escape, dan pengembalian fokus. Pengaju melihat badge baca saja. Kolom No. invoice mempertahankan format teks dan dapat membungkus nomor panjang; scroll horizontal tetap dibatasi pada tabel. Data invoice lama menampilkan Belum dilengkapi tanpa mengarang nomor dokumen.
+
 Chart Admin menjawab tren nilai dan urgensi kebutuhan; chart Pengaju memisahkan tindak lanjut barang dari tren pemenuhan. Kontainer stabil, dengan tooltip, legenda, bentuk penanda urgensi dan alternatif tabel. Dua kolom kedua peran menjadi satu pada layar kecil.
 
 Rentang tanggal berupa Popover dengan preset dan kalender, kontrol Dari/Sampai, Terapkan/Batal dan hapus rentang. Desktop menempatkan preset di samping; mobile menyusunnya di atas kalender dalam Sheet dari bawah, dengan tombol aksi tetap terjangkau. Perubahan hanya berlaku setelah Terapkan. Pengurutan, filter dan periode mengembalikan pagination ke awal tanpa toast.

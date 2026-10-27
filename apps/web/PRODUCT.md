@@ -28,6 +28,10 @@ Tugas mudah ditemukan, informasi cepat dipindai, aksi mendapatkan umpan balik, k
 
 ## Documents and insights
 
+Status pengajuan merupakan pencatatan administratif tersendiri: Belum diajukan secara default, atau Sudah diajukan. Admin mengubahnya langsung pada sel tabel atau detail; Pengaju hanya melihatnya. Perubahan tidak memajukan tahapan pembelian atau mengubah anggaran, dan diperiksa ulang sebelum disimpan. Nilainya bertahan setelah refresh serta ikut diurutkan dan diekspor.
+
+No. invoice mengikuti nomor asli dokumen, wajib saat menyimpan atau memperbarui invoice, maksimal 120 karakter. Nilai disimpan sebagai teks agar nol awal tetap utuh. Invoice lama tetap dapat dibaca dengan nomor Belum dilengkapi. Nomor tersedia pada tabel, detail, halaman invoice, dan ekspor Excel.
+
 Invoice dikelola Admin sejak persetujuan, dapat dilihat Pengaju pemilik request dan wajib sebelum Selesai. Format PDF/gambar hingga 10 MB atau tautan HTTP/HTTPS. Blob memakai IndexedDB per tab, metadata memakai snapshot Zod; file baru harus berhasil disimpan sebelum penggantian metadata. Pemeriksaan status setelah operasi async mencegah perubahan stale.
 
 Tab Pembelian Barang dan RAB menggunakan URL. RAB CSV/XLSX/PDF maksimal 10 MB dan 1.000 barang; worksheet/pemetaan, review dan koreksi mendahului konfirmasi. PDF dipratinjau dan diisi manual tanpa OCR. Versi RAB bersifat tetap untuk request lama, satu versi aktif per riset. Pengaju membaca daftar barang dan membuat request dari barang yang dipilih. Nilai RAB tidak mengubah alokasi.
