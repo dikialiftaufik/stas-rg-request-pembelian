@@ -43,6 +43,37 @@ describe('sorting sesuai jenis data', () => {
       ]);
     expect(JSON.stringify(tied)).toBe(before);
   });
+  it('sorts submission labels and invoice numbers naturally in both directions', () => {
+    const entries = rows.map((row, index) => ({
+      ...row,
+      submissionStatus: index === 1 ? ('submitted' as const) : ('not_submitted' as const),
+      invoice: {
+        number: ['0010', '0002', '0001'].at(index) ?? '',
+        amount: null,
+        invoiceDate: null,
+        file: null,
+        url: 'https://example.test/invoice',
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'demo-admin',
+      },
+    }));
+    expect(sortRequests(entries, data, 'submissionStatus', 'asc').map((row) => row.id)).toEqual([
+      'request-1',
+      'request-3',
+      'request-2',
+    ]);
+    expect(sortRequests(entries, data, 'submissionStatus', 'desc').map((row) => row.id)).toEqual([
+      'request-2',
+      'request-1',
+      'request-3',
+    ]);
+    expect(
+      sortRequests(entries, data, 'invoiceNumber', 'asc').map((row) => row.invoice?.number),
+    ).toEqual(['0001', '0002', '0010']);
+    expect(
+      sortRequests(entries, data, 'invoiceNumber', 'desc').map((row) => row.invoice?.number),
+    ).toEqual(['0010', '0002', '0001']);
+  });
   it('NIP/NIM menggunakan urutan natural dan mempertahankan nol awal', () => {
     const users = data.users
       .slice(0, 3)

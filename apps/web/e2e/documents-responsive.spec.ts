@@ -57,6 +57,7 @@ for (const viewport of [
     });
     await page.goto('/requests?detail=request-2');
     await page.getByRole('link', { name: 'Unggah invoice' }).click();
+    await page.getByLabel('No. invoice', { exact: true }).fill('INV/2026/001');
     await page.getByLabel('Total invoice (Rp)', { exact: true }).fill('12000000');
     await page.getByLabel('Tanggal invoice', { exact: true }).fill('2026-01-01');
     await page.getByLabel('File invoice', { exact: true }).setInputFiles({

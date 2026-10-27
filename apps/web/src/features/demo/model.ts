@@ -81,6 +81,7 @@ export const webUrlSchema = z
   }, 'Gunakan tautan HTTP atau HTTPS yang lengkap.');
 export const invoiceSchema = z
   .object({
+    number: z.string().trim().min(1).max(120).nullable().default(null),
     amount: positiveMoneySchema.nullable().default(null),
     invoiceDate: z.iso.date().nullable().default(null),
     file: attachmentSchema.nullable(),
@@ -90,6 +91,11 @@ export const invoiceSchema = z
   })
   .refine((value) => Boolean(value.file || value.url), 'Unggah file atau isi tautan invoice.');
 export const invoiceInputSchema = z.object({
+  number: z
+    .string()
+    .trim()
+    .min(1, 'Nomor invoice wajib diisi.')
+    .max(120, 'Nomor invoice maksimal 120 karakter.'),
   amount: positiveMoneySchema,
   invoiceDate: z.iso
     .date('Tanggal invoice tidak valid.')

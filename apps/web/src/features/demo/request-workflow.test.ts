@@ -29,6 +29,7 @@ describe('alur status pembelian', () => {
       if (nextStatus === 'completed')
         await saveInvoice({
           amount: '100000',
+          number: 'INV/2026/001',
           invoiceDate: '2026-01-01',
           requestId: before.id,
           url: 'https://example.test/invoice',

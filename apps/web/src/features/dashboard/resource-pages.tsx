@@ -354,6 +354,10 @@ export function RequestRecordPage({
             )}
           </RecordCard>
           <RecordCard title="Invoice">
+            <p className={styles.invoiceNumber}>
+              {request.invoice?.number ??
+                (request.invoice ? 'Nomor belum dilengkapi' : 'Belum ada invoice')}
+            </p>
             <p>
               {request.invoice?.amount
                 ? formatMoney(request.invoice.amount)

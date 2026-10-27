@@ -35,6 +35,7 @@ const columns = [
   ['submissionStatus', 'Status pengajuan'],
   ['createdAt', 'Diajukan'],
   ['invoice', 'Invoice'],
+  ['invoiceNumber', 'No. invoice'],
 ] as const;
 
 export function RequestList({ recent = false }: { recent?: boolean }) {
@@ -291,6 +292,10 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
                   <td className={styles.dateCell}>{formatDate(request.createdAt)}</td>
                   <td>
                     <InvoiceCell request={request} />
+                  </td>
+                  <td className={styles.invoiceNumber}>
+                    {request.invoice?.number ??
+                      (request.invoice ? 'Belum dilengkapi' : 'Belum ada')}
                   </td>
                   <td>
                     <div className={styles.rowActions}>

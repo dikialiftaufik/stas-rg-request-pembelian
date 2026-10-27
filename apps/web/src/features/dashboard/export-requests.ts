@@ -31,6 +31,7 @@ export async function buildRequestWorkbook(
     { header: 'Total invoice (Rp)', key: 'invoiceAmount', width: 22 },
     { header: 'Tanggal invoice', key: 'invoiceDate', width: 22 },
     { header: 'Status pengajuan', key: 'submissionStatus', width: 22 },
+    { header: 'No. invoice', key: 'invoiceNumber', width: 26 },
   ];
   rows.forEach((row) =>
     sheet.addRow({
@@ -49,6 +50,7 @@ export async function buildRequestWorkbook(
       invoiceAmount: row.invoice?.amount ? Number(row.invoice.amount) : null,
       invoiceDate: row.invoice?.invoiceDate ?? '',
       submissionStatus: submissionStatusLabels[row.submissionStatus],
+      invoiceNumber: row.invoice?.number ?? '',
     }),
   );
   sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -56,7 +58,7 @@ export async function buildRequestWorkbook(
   sheet.getColumn('unitPrice').numFmt = '#,##0.00';
   sheet.getColumn('invoiceAmount').numFmt = '#,##0.00';
   sheet.getColumn('total').numFmt = '#,##0.00';
-  sheet.autoFilter = { from: 'A1', to: 'O1' };
+  sheet.autoFilter = { from: 'A1', to: 'P1' };
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   const info = workbook.addWorksheet('Informasi ekspor');
   info.addRows([

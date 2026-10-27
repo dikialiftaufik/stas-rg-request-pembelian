@@ -156,6 +156,7 @@ test('invoice menyimpan nominal asli, tanggal dan kolom ekspor; warna ekspor kon
 }) => {
   await login(page);
   await page.goto('/requests/request-2/invoice');
+  await page.getByLabel('No. invoice', { exact: true }).fill('INV/2026/001');
   await page.getByLabel('Total invoice (Rp)', { exact: true }).fill('11250000.5');
   await page.getByLabel('Tanggal invoice', { exact: true }).fill('2026-01-01');
   await page.getByLabel('Tautan invoice (opsional)').fill('https://example.test/invoice');

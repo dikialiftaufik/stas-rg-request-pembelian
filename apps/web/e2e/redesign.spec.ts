@@ -25,6 +25,7 @@ test('Admin memproses semua tahapan, toast, riwayat dan notifikasi tersimpan', a
     const request = snapshot.requests.find((item) => item.id === 'request-1');
     if (request)
       request.invoice = {
+        number: 'INV/2026/001',
         amount: '12500000',
         invoiceDate: '2026-01-01',
         file: null,

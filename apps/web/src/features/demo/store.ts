@@ -506,6 +506,7 @@ export async function saveInvoice(input: {
   file?: File | undefined;
   url: string;
   expectedUpdatedAt: string | null;
+  number: string;
   amount: string;
   invoiceDate: string;
 }) {

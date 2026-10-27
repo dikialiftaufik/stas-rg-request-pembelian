@@ -12,6 +12,7 @@ export const requestColumns = [
   'submissionStatus',
   'createdAt',
   'invoice',
+  'invoiceNumber',
 ] as const;
 export const userColumns = [
   'name',
@@ -83,6 +84,8 @@ export function sortRequests(
         return research.get(row.researchId) ?? '';
       case 'invoice':
         return row.invoice?.file?.name ?? row.invoice?.url ?? '';
+      case 'invoiceNumber':
+        return row.invoice?.number ?? '';
       case 'submissionStatus':
         return submissionStatusLabels[row.submissionStatus];
       case 'status':

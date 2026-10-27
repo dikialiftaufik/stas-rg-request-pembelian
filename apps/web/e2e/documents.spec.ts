@@ -61,6 +61,7 @@ test('invoice dapat dipratinjau, diganti dan dibaca Pengaju setelah refresh', as
   await page.getByRole('link', { name: 'Ubah status', exact: true }).click();
   await page.getByRole('button', { name: 'Konfirmasi perubahan status' }).click();
   await page.getByRole('link', { name: 'Unggah invoice' }).click();
+  await page.getByLabel('No. invoice', { exact: true }).fill('INV/2026/001');
   await page.getByLabel('Total invoice (Rp)', { exact: true }).fill('12500000');
   await page.getByLabel('Tanggal invoice', { exact: true }).fill('2026-01-01');
   await page

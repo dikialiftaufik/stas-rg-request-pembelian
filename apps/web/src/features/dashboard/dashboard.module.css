@@ -1336,6 +1336,11 @@
   gap: 4px;
   min-width: 108px;
 }
+.invoiceNumber {
+  min-width: 120px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
 .submissionTrigger {
   min-height: 34px;
   padding: 5px 9px;

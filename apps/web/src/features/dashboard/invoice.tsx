@@ -36,6 +36,7 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
   } = useForm<InvoiceValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      number: invoice?.number ?? '',
       amount: invoice?.amount ?? '',
       invoiceDate: invoice?.invoiceDate ?? '',
       url: invoice?.url ?? '',
@@ -98,6 +99,10 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
       {invoice && (
         <>
           <dl className={styles.detailGrid}>
+            <div>
+              <dt>No. invoice</dt>
+              <dd>{invoice.number ?? 'Belum dilengkapi'}</dd>
+            </div>
             <div>
               <dt>Total invoice</dt>
               <dd className={styles.pageTotal}>
@@ -185,6 +190,22 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
           onSubmit={(event) => void submit(event)}
         >
           <FieldGroup>
+            <Field
+              id="invoice-number"
+              label="No. invoice"
+              error={errors.number?.message}
+              hint="Salin nomor yang tertera pada dokumen invoice."
+            >
+              <input
+                {...register('number')}
+                {...fieldAttributes('invoice-number', errors.number?.message)}
+                maxLength={120}
+                spellCheck={false}
+                placeholder="Contoh: INV/2026/001…"
+                disabled={busy}
+                required
+              />
+            </Field>
             <div className={styles.formGrid}>
               <Field id="invoice-amount" label="Total invoice (Rp)" error={errors.amount?.message}>
                 <input
