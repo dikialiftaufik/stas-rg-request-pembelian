@@ -6,6 +6,9 @@ import {
   visibleRequest,
   saveResearch,
   reloadDemoState,
+  DEMO_STORAGE_KEY,
+  consumeAdminNotice,
+  logoutDemo,
 } from './store';
 import { allowedNextStatuses } from './request-workflow';
 import { researchUsed } from './model';
@@ -115,5 +118,37 @@ describe('alur status pembelian', () => {
       }),
     ).rejects.toThrow(/Alokasi/);
     expect(JSON.stringify(getSnapshot())).toBe(before);
+  });
+});
+describe('kompatibilitas dan sesi pemberitahuan', () => {
+  it('snapshot versi lama mendapat default dan mempertahankan perubahan data', () => {
+    const legacy = JSON.parse(JSON.stringify(getSnapshot())) as {
+      adminNoticeSeen?: boolean;
+      requests: { item: string; statusHistory?: unknown }[];
+    };
+    delete legacy.adminNoticeSeen;
+    legacy.requests.forEach((request) => {
+      delete request.statusHistory;
+    });
+    if (legacy.requests[0]) legacy.requests[0].item = 'Barang tersimpan';
+    sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(legacy));
+    reloadDemoState();
+    expect(getSnapshot().adminNoticeSeen).toBe(false);
+    expect(getSnapshot().requests[0]).toMatchObject({
+      item: 'Barang tersimpan',
+      statusHistory: [],
+    });
+  });
+  it('refresh dan login gagal tidak mereset penanda, logout serta login sukses meresetnya', () => {
+    admin();
+    consumeAdminNotice();
+    reloadDemoState();
+    expect(getSnapshot().adminNoticeSeen).toBe(true);
+    expect(loginDemo('admin@gmail.com', 'salah')).toBe(false);
+    expect(getSnapshot().adminNoticeSeen).toBe(true);
+    logoutDemo();
+    expect(getSnapshot().adminNoticeSeen).toBe(false);
+    admin();
+    expect(getSnapshot().adminNoticeSeen).toBe(false);
   });
 });

@@ -108,9 +108,7 @@ describe('akses dashboard demo', () => {
       ).toBeVisible();
     expect(window.location.pathname).toBe('/dashboard');
     if (role === 'admin') {
-      expect(
-        await screen.findByRole('alertdialog', { name: 'Pemberitahuan Request' }),
-      ).toBeVisible();
+      expect(await screen.findByRole('dialog', { name: 'Pemberitahuan Request' })).toBeVisible();
       await user.click(screen.getByRole('button', { name: 'Nanti saja' }));
       expect(screen.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
     } else {

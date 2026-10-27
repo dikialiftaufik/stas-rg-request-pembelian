@@ -10,13 +10,14 @@ function account(data: DemoSnapshot, id = 'demo-admin') {
 }
 
 describe('pemberitahuan request Admin', () => {
-  it('mengambil tiga request yang relevan tanpa mengubah dataset', () => {
+  it('mengambil seluruh request yang relevan tanpa mengubah dataset', () => {
     const data = createSeed();
     const before = JSON.stringify(data);
     expect(adminRequestNotices(data, account(data)).map((item) => item.id)).toEqual([
       'request-1',
       'request-5',
       'request-6',
+      'request-7',
     ]);
     expect(JSON.stringify(data)).toBe(before);
   });
@@ -27,7 +28,7 @@ describe('pemberitahuan request Admin', () => {
   it('tetap mengingatkan persetujuan yang belum selesai meskipun notifikasi telah dibaca', () => {
     const data = createSeed();
     data.notifications = data.notifications.map((item) => ({ ...item, read: true }));
-    expect(adminRequestNotices(data, account(data))).toHaveLength(3);
+    expect(adminRequestNotices(data, account(data))).toHaveLength(4);
   });
   it('mengabaikan request terhapus, status yang sudah diproses, dan notifikasi duplikat', () => {
     const data = createSeed();
@@ -41,7 +42,10 @@ describe('pemberitahuan request Admin', () => {
     const notice = data.notifications.find((item) => item.requestId === 'request-6');
     if (!notice) throw new Error('Notifikasi tidak tersedia');
     data.notifications.unshift({ ...notice, id: 'duplicate', createdAt: '2026-10-26T08:00:00Z' });
-    expect(adminRequestNotices(data, account(data)).map((item) => item.id)).toEqual(['request-6']);
+    expect(adminRequestNotices(data, account(data)).map((item) => item.id)).toEqual([
+      'request-6',
+      'request-7',
+    ]);
   });
   it('menggunakan request pending ketika belum ada notifikasi', () => {
     const data = createSeed();

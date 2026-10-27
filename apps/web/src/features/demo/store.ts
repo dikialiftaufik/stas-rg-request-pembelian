@@ -67,11 +67,11 @@ export function loginDemo(email: string, password: string) {
     (item) => item.email === email.trim().toLowerCase() && item.password === password,
   );
   if (!account) return false;
-  publish({ ...getSnapshot(), accountId: account.id });
+  publish({ ...getSnapshot(), accountId: account.id, adminNoticeSeen: false });
   return true;
 }
 export function logoutDemo() {
-  publish({ ...getSnapshot(), accountId: null });
+  publish({ ...getSnapshot(), accountId: null, adminNoticeSeen: false });
 }
 function requireUser(adminOnly = false) {
   const user = currentUser();
@@ -353,4 +353,9 @@ export async function changeRequestStatus(input: {
       `${request.item}: ${statusLabelMap.get(nextStatus)}.${reason ? ` ${reason}` : ''}`,
     ),
   );
+}
+
+export function consumeAdminNotice() {
+  requireUser(true);
+  if (!getSnapshot().adminNoticeSeen) publish({ ...getSnapshot(), adminNoticeSeen: true });
 }

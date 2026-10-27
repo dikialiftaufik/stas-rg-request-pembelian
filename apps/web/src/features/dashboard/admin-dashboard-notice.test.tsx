@@ -1,9 +1,15 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '@/App';
 import { AppProviders } from '@/test/app-providers';
-import { DEMO_STORAGE_KEY, getSnapshot, loginDemo, reloadDemoState } from '../demo/store';
+import {
+  DEMO_STORAGE_KEY,
+  getSnapshot,
+  loginDemo,
+  reloadDemoState,
+  logoutDemo,
+} from '../demo/store';
 import { createSeed } from '../demo/seed';
 
 function renderDashboard(role: 'admin' | 'pengaju' = 'admin') {
@@ -15,57 +21,66 @@ function renderDashboard(role: 'admin' | 'pengaju' = 'admin') {
     </AppProviders>,
   );
 }
-
-describe('hard popup dashboard', () => {
-  it('menampilkan pesan dari data aktual dan mengharuskan penutupan manual', async () => {
-    const user = userEvent.setup();
+function popup() {
+  return screen.queryByRole('dialog', { name: 'Pemberitahuan Request' });
+}
+describe('pemberitahuan pertama sesi Admin', () => {
+  it('merangkum semua pending, menampilkan tiga terbaru dan tidak menandai lonceng dibaca', async () => {
     renderDashboard();
-    const notice = screen.getByRole('alertdialog', { name: 'Pemberitahuan Request' });
-    expect(notice).toBeVisible();
-    expect(screen.getByText('1 dari 3')).toBeVisible();
-    expect(
-      screen.getByRole('heading', { name: 'Persetujuan diperlukan: Oscilloscope Digital' }),
-    ).toHaveFocus();
-    expect(notice).toHaveAccessibleDescription(/Ir. Citra Dewi.*Rp 12.500.000/);
+    expect(popup()).toBeVisible();
+    expect(popup()).toHaveAccessibleDescription(/4 request menunggu persetujuan/);
+    expect(screen.getByText('Oscilloscope Digital', { selector: 'strong' })).toBeVisible();
+    expect(popup()?.querySelectorAll('li')).toHaveLength(3);
+    expect(getSnapshot().adminNoticeSeen).toBe(true);
     expect(document.body).toHaveAttribute('data-scroll-locked', '1');
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(notice).toBeVisible();
-    await user.click(notice);
-    expect(notice).toBeVisible();
+    const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Nanti saja' }));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(document.body.style.overflow).toBe('');
-    expect(screen.getByRole('main')).toHaveFocus();
+    expect(popup()).not.toBeInTheDocument();
+    expect(document.body).not.toHaveAttribute('data-scroll-locked');
     expect(
       getSnapshot().notifications.filter((item) => item.recipientId === 'demo-admin' && !item.read),
     ).toHaveLength(3);
   });
-  it('tombol X menutup popup dan kembali ke dashboard memunculkannya lagi', async () => {
+  it('X menutup popup, navigasi dan remount setelah refresh tidak mengulanginya', async () => {
     const user = userEvent.setup();
-    renderDashboard();
+    const view = renderDashboard();
     await user.click(screen.getByRole('button', { name: 'Tutup pemberitahuan' }));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Request Pembelian' }));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Dashboard' }));
-    expect(screen.getByRole('alertdialog')).toBeVisible();
+    expect(popup()).not.toBeInTheDocument();
+    view.unmount();
+    reloadDemoState();
+    render(
+      <AppProviders>
+        <App />
+      </AppProviders>,
+    );
+    expect(popup()).not.toBeInTheDocument();
   });
-  it('Tinjau Request membuka detail yang benar dan menandai pemberitahuan tersebut dibaca', async () => {
+  it('mendukung Escape manual dan mengulang hanya setelah login sukses berikutnya', async () => {
+    const view = renderDashboard();
+    await userEvent.setup().keyboard('{Escape}');
+    expect(popup()).not.toBeInTheDocument();
+    view.unmount();
+    expect(loginDemo('admin@gmail.com', 'salah')).toBe(false);
+    expect(getSnapshot().adminNoticeSeen).toBe(true);
+    logoutDemo();
+    renderDashboard();
+    expect(popup()).toBeVisible();
+  });
+  it('CTA mengarah ke daftar pending tanpa menumpuk dialog', async () => {
     const user = userEvent.setup();
     renderDashboard();
-    await user.click(screen.getByRole('button', { name: 'Tinjau Request' }));
-    expect(await screen.findByRole('dialog', { name: 'Detail Request Pembelian' })).toBeVisible();
+    await user.click(screen.getByRole('link', { name: 'Tinjau request' }));
     expect(window.location.pathname).toBe('/requests');
-    expect(window.location.search).toBe('?detail=request-1');
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(getSnapshot().notifications.find((item) => item.id === 'notice-1')?.read).toBe(true);
+    expect(window.location.search).toBe('?status=pending_review');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
-  it('tidak menampilkan hard popup untuk Pengaju', () => {
+  it('tidak menampilkan popup untuk Pengaju', () => {
     renderDashboard('pengaju');
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(document.body.style.overflow).toBe('');
+    expect(popup()).not.toBeInTheDocument();
   });
-  it('menyediakan penutupan manual ketika tidak ada request pending', async () => {
+  it('snapshot lama dibaca dan tidak menampilkan popup kosong', () => {
     const data = createSeed();
     sessionStorage.setItem(
       DEMO_STORAGE_KEY,
@@ -82,10 +97,7 @@ describe('hard popup dashboard', () => {
         <App />
       </AppProviders>,
     );
-    expect(screen.getByRole('alertdialog')).toBeVisible();
-    expect(screen.getByText('Tidak ada request menunggu persetujuan')).toBeVisible();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Lanjut ke Dashboard' }));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(popup()).not.toBeInTheDocument();
+    expect(getSnapshot().adminNoticeSeen).toBe(true);
   });
 });
