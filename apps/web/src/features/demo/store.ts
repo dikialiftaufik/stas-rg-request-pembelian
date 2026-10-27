@@ -10,6 +10,7 @@ import {
   statusLabelMap,
   invoiceSchema,
   invoiceInputSchema,
+  fulfillmentInputSchema,
   rabItemInputSchema,
 } from './model';
 import type {
@@ -22,6 +23,7 @@ import type {
   AttachmentRef,
   RabDocument,
   RabItemInput,
+  FulfillmentInput,
 } from './model';
 import { createSeed, demoAccounts } from './seed';
 import { allowedNextStatuses } from './request-workflow';
@@ -89,6 +91,10 @@ export function loginDemo(email: string, password: string) {
 }
 export function logoutDemo() {
   publish({ ...getSnapshot(), accountId: null, adminNoticeSeen: false });
+}
+export function consumeAdminNotice() {
+  requireUser(true);
+  if (!getSnapshot().adminNoticeSeen) publish({ ...getSnapshot(), adminNoticeSeen: true });
 }
 function requireUser(adminOnly = false) {
   const user = currentUser();
@@ -239,6 +245,76 @@ export function cancelRequest(id: string) {
     ),
   );
 }
+
+export async function changeRequestStatus(input: {
+  id: string;
+  expectedStatus: RequestStatus;
+  nextStatus: RequestStatus;
+  reason?: string;
+}) {
+  const user = requireUser(true);
+  let request = visibleRequest(input.id);
+  if (input.nextStatus === 'completed') {
+    if (
+      !request.invoice ||
+      !invoiceSchema.safeParse(request.invoice).success ||
+      !invoiceInputSchema.safeParse(request.invoice).success
+    )
+      throw new Error('Lengkapi invoice sebelum menyelesaikan Pembelian Barang.');
+    const invoiceVersion = request.invoice.updatedAt;
+    if (request.invoice.file) await getAttachment(request.invoice.file);
+    request = visibleRequest(input.id);
+    if (request.invoice?.updatedAt !== invoiceVersion)
+      throw new Error('Invoice berubah. Periksa invoice terbaru sebelum menyelesaikan request.');
+    if (requireUser(true).id !== user.id)
+      throw new Error('Sesi berubah. Buka kembali request untuk melanjutkan.');
+  }
+  const nextStatus = statusSchema.parse(input.nextStatus);
+  if (request.status !== input.expectedStatus)
+    throw new Error(
+      'Status sudah berubah. Tutup lalu buka kembali form untuk melihat status terbaru.',
+    );
+  if (!allowedNextStatuses(request.status).includes(nextStatus))
+    throw new Error('Perubahan status tidak diizinkan. Pilih tahapan berikutnya yang tersedia.');
+  if (input.nextStatus === 'completed' && !request.invoice)
+    throw new Error('Lengkapi invoice sebelum menyelesaikan Pembelian Barang.');
+  const reason = input.reason?.trim() ?? '';
+  if (nextStatus === 'rejected' && !reason)
+    throw new Error('Jelaskan alasan penolakan agar Pengaju dapat menindaklanjuti.');
+  const updated = {
+    ...request,
+    status: nextStatus,
+    statusHistory: [
+      ...request.statusHistory,
+      {
+        from: request.status,
+        to: nextStatus,
+        actorId: user.id,
+        at: new Date().toISOString(),
+        reason,
+      },
+    ],
+  };
+  const data = getSnapshot();
+  const next = {
+    ...data,
+    requests: data.requests.map((item) => (item.id === request.id ? updated : item)),
+  };
+  const research = data.research.find((item) => item.id === request.researchId);
+  if (!research || researchUsed(next, research.id).gt(research.allocated))
+    throw new Error(
+      'Alokasi dana riset tidak mencukupi. Periksa alokasi sebelum menyetujui request.',
+    );
+  publish(
+    notification(
+      next,
+      request.ownerId,
+      request.id,
+      `${request.item}: ${statusLabelMap.get(nextStatus)}.${reason ? ` ${reason}` : ''}`,
+    ),
+  );
+}
+
 export function saveUser(input: UserInput, id?: string) {
   requireUser(true);
   const values = userInputSchema.parse(input);
@@ -340,83 +416,30 @@ export function dashboardSummary(data: DemoSnapshot, user: DemoUser) {
   };
 }
 
-export async function changeRequestStatus(input: {
-  id: string;
-  expectedStatus: RequestStatus;
-  nextStatus: RequestStatus;
-  reason?: string;
-}) {
-  const user = requireUser(true);
-  let request = visibleRequest(input.id);
-  if (input.nextStatus === 'completed') {
-    if (
-      !request.invoice ||
-      !invoiceSchema.safeParse(request.invoice).success ||
-      !invoiceInputSchema.safeParse(request.invoice).success
-    )
-      throw new Error('Lengkapi invoice sebelum menyelesaikan Pembelian Barang.');
-    const invoiceVersion = request.invoice.updatedAt;
-    if (request.invoice.file) await getAttachment(request.invoice.file);
-    request = visibleRequest(input.id);
-    if (request.invoice?.updatedAt !== invoiceVersion)
-      throw new Error('Invoice berubah. Periksa invoice terbaru sebelum menyelesaikan request.');
-    if (requireUser(true).id !== user.id)
-      throw new Error('Sesi berubah. Buka kembali request untuk melanjutkan.');
-  }
-  const nextStatus = statusSchema.parse(input.nextStatus);
-  if (request.status !== input.expectedStatus)
-    throw new Error(
-      'Status sudah berubah. Tutup lalu buka kembali form untuk melihat status terbaru.',
-    );
-  if (!allowedNextStatuses(request.status).includes(nextStatus))
-    throw new Error('Perubahan status tidak diizinkan. Pilih tahapan berikutnya yang tersedia.');
-  if (input.nextStatus === 'completed' && !request.invoice)
-    throw new Error('Lengkapi invoice sebelum menyelesaikan Pembelian Barang.');
-  const reason = input.reason?.trim() ?? '';
-  if (nextStatus === 'rejected' && !reason)
-    throw new Error('Jelaskan alasan penolakan agar Pengaju dapat menindaklanjuti.');
-  const updated = {
-    ...request,
-    status: nextStatus,
-    statusHistory: [
-      ...request.statusHistory,
-      {
-        from: request.status,
-        to: nextStatus,
-        actorId: user.id,
-        at: new Date().toISOString(),
-        reason,
-      },
-    ],
-  };
-  const data = getSnapshot();
-  const next = {
-    ...data,
-    requests: data.requests.map((item) => (item.id === request.id ? updated : item)),
-  };
-  const research = data.research.find((item) => item.id === request.researchId);
-  if (!research || researchUsed(next, research.id).gt(research.allocated))
-    throw new Error(
-      'Alokasi dana riset tidak mencukupi. Periksa alokasi sebelum menyetujui request.',
-    );
-  publish(
-    notification(
-      next,
-      request.ownerId,
-      request.id,
-      `${request.item}: ${statusLabelMap.get(nextStatus)}.${reason ? ` ${reason}` : ''}`,
-    ),
+export function scopedRabs(data: DemoSnapshot, user: DemoUser) {
+  return data.rabDocuments.filter(
+    (doc) => user.role === 'admin' || (doc.active && user.researchIds.includes(doc.researchId)),
   );
 }
-export function consumeAdminNotice() {
-  requireUser(true);
-  if (!getSnapshot().adminNoticeSeen) publish({ ...getSnapshot(), adminNoticeSeen: true });
+export function visibleRab(id: string) {
+  const user = requireUser();
+  const data = getSnapshot();
+  const doc = data.rabDocuments.find((item) => item.id === id);
+  const referencedByOwnRequest = data.requests.some(
+    (request) => !request.deleted && request.ownerId === user.id && request.rabDocumentId === id,
+  );
+  if (
+    !doc ||
+    (user.role !== 'admin' &&
+      !(doc.active && user.researchIds.includes(doc.researchId)) &&
+      !referencedByOwnRequest)
+  )
+    throw new Error('RAB tidak ditemukan atau tidak dapat diakses.');
+  return doc;
 }
-
 export function canManageInvoice(status: RequestStatus) {
   return ['approved', 'ordered', 'in_transit', 'delivered', 'completed'].includes(status);
 }
-
 export async function loadInvoiceFile(requestId: string) {
   const request = visibleRequest(requestId);
   if (!request.invoice?.file) throw new Error('Invoice belum memiliki file.');
@@ -424,7 +447,11 @@ export async function loadInvoiceFile(requestId: string) {
   visibleRequest(requestId);
   return blob;
 }
-
+export async function loadRabFile(documentId: string) {
+  const blob = await getAttachment(visibleRab(documentId).source);
+  visibleRab(documentId);
+  return blob;
+}
 export async function saveInvoice(input: {
   requestId: string;
   file?: File | undefined;
@@ -488,36 +515,43 @@ export async function saveInvoice(input: {
     throw cause;
   }
 }
-
-export function scopedRabs(data: DemoSnapshot, user: DemoUser) {
-  return data.rabDocuments.filter(
-    (doc) => user.role === 'admin' || (doc.active && user.researchIds.includes(doc.researchId)),
-  );
-}
-
-export function visibleRab(id: string) {
-  const user = requireUser();
+export function saveFulfillment(input: {
+  requestId: string;
+  values: FulfillmentInput;
+  expectedUpdatedAt: string | null;
+}) {
+  const actor = requireUser(true);
+  const request = visibleRequest(input.requestId);
+  if (!canManageInvoice(request.status))
+    throw new Error('Informasi pengiriman tersedia setelah request disetujui.');
+  if ((request.fulfillment?.updatedAt ?? null) !== input.expectedUpdatedAt)
+    throw new Error(
+      'Informasi pengiriman sudah berubah. Muat ulang halaman lalu periksa data terbaru.',
+    );
+  const values = fulfillmentInputSchema.parse(input.values);
+  const fulfillment = {
+    ...values,
+    updatedAt: new Date(
+      Math.max(Date.now(), request.fulfillment ? Date.parse(request.fulfillment.updatedAt) + 1 : 0),
+    ).toISOString(),
+    updatedBy: actor.id,
+  };
   const data = getSnapshot();
-  const doc = data.rabDocuments.find((item) => item.id === id);
-  const referencedByOwnRequest = data.requests.some(
-    (request) => !request.deleted && request.ownerId === user.id && request.rabDocumentId === id,
+  publish(
+    notification(
+      {
+        ...data,
+        requests: data.requests.map((item) =>
+          item.id === request.id ? { ...item, fulfillment } : item,
+        ),
+      },
+      request.ownerId,
+      request.id,
+      `Informasi pengiriman ${request.item} diperbarui.`,
+    ),
+    true,
   );
-  if (
-    !doc ||
-    (user.role !== 'admin' &&
-      !(doc.active && user.researchIds.includes(doc.researchId)) &&
-      !referencedByOwnRequest)
-  )
-    throw new Error('RAB tidak ditemukan atau tidak dapat diakses.');
-  return doc;
 }
-
-export async function loadRabFile(documentId: string) {
-  const blob = await getAttachment(visibleRab(documentId).source);
-  visibleRab(documentId);
-  return blob;
-}
-
 export async function importRab(input: {
   researchId: string;
   name: string;
