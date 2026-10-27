@@ -11,6 +11,7 @@ async function signIn(page: Page, role: 'admin' | 'pengaju' = 'admin') {
   await page.getByRole('button', { name: 'Masuk ke Dashboard' }).click();
   await page.waitForURL('**/dashboard');
   if (role === 'admin') await page.getByRole('button', { name: 'Nanti saja' }).click();
+  await expect(page.locator('[data-chart-ready]').first()).toBeVisible();
 }
 
 test('Admin memproses semua tahapan, toast, riwayat dan notifikasi tersimpan', async ({ page }) => {

@@ -1,6 +1,6 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RabList } from './rab-list';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import Decimal from 'decimal.js';
@@ -26,6 +26,9 @@ import { readSort, userColumns, sortParams, sortUsers, representedResearch } fro
 import type { DemoUser } from '../demo/model';
 import { useRecordNavigation, rememberScroll } from './record-navigation';
 import styles from './dashboard.module.css';
+
+const AdminAnalytics = lazy(() => import('./admin-analytics'));
+const PersonalAnalytics = lazy(() => import('./personal-analytics'));
 
 export function DashboardPage() {
   const { data, user } = useDemo();
@@ -87,6 +90,33 @@ export function DashboardPage() {
           </article>
         ))}
       </section>
+      {user.role === 'admin' && (
+        <Suspense
+          fallback={
+            <section className={styles.analytics} aria-label="Memuat analitik">
+              <div className={styles.chartPanel}>
+                <p role="status">Memuat tren nilai…</p>
+              </div>
+              <div className={styles.chartPanel}>
+                <p>Memuat peta urgensi…</p>
+              </div>
+            </section>
+          }
+        >
+          <AdminAnalytics />
+        </Suspense>
+      )}
+      {user.role === 'pengaju' && (
+        <Suspense
+          fallback={
+            <section className={styles.agendaPanel} aria-label="Memuat analitik pribadi">
+              <p role="status">Memuat kebutuhan barang…</p>
+            </section>
+          }
+        >
+          <PersonalAnalytics />
+        </Suspense>
+      )}
       <RequestList recent />
       {user.role === 'admin' && <AdminDashboardNotice />}
     </>

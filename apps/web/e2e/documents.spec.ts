@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import ExcelJS from 'exceljs';
 import { readFile } from 'node:fs/promises';
 import { choose } from './helpers';
@@ -11,6 +12,7 @@ async function signIn(page: Page, role: 'admin' | 'pengaju' = 'admin') {
   await page.getByRole('button', { name: 'Masuk ke Dashboard' }).click();
   await page.waitForURL('**/dashboard');
   if (role === 'admin') await page.getByRole('button', { name: 'Nanti saja' }).click();
+  await expect(page.locator('[data-chart-ready]').first()).toBeVisible();
 }
 async function openImport(page: Page) {
   await page.goto('/requests?tab=rab');
@@ -188,4 +190,41 @@ test('periode URL dan Excel memakai seluruh hasil filter', async ({ page }) => {
   expect(book.getWorksheet('Informasi ekspor')?.getCell('B2').value).toBe('2026-10-01');
   expect(book.getWorksheet('Pembelian Barang')?.rowCount).toBe(25);
   expect(book.getWorksheet('Pembelian Barang')?.getCell('J1').value).toBe('File invoice');
+});
+
+test.describe('layar sentuh', () => {
+  test.use({ hasTouch: true, isMobile: true });
+  test('chart dan kalender aksesibel pada lebar 320 px', async ({ page }) => {
+    await signIn(page);
+    await expect(page.getByRole('heading', { name: 'Tren nilai Pembelian Barang' })).toBeVisible();
+    await page.getByText('Lihat data tren', { exact: true }).click();
+    await expect(
+      page.getByRole('table', { name: 'Nilai pengajuan per periode' }).locator('tbody tr'),
+    ).toHaveCount(8);
+    await page.goto('/requests');
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.getByRole('button', { name: 'Rentang tanggal pengajuan: Semua tanggal' }).click();
+    const result = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .analyze();
+    expect(
+      result.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')),
+    ).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    const targets = await page
+      .getByRole('dialog')
+      .locator('button, input')
+      .evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const box = element.getBoundingClientRect();
+            return { width: box.width, height: box.height };
+          })
+          .filter((box) => box.width > 0),
+      );
+    expect(targets.every((box) => box.width >= 43.9 && box.height >= 43.9)).toBe(true);
+    await page.screenshot({ path: '.turbo/purchase-finish/calendar-320.png', fullPage: true });
+  });
 });

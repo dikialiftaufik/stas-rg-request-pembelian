@@ -24,6 +24,7 @@ async function signIn(page: Page, role: 'admin' | 'pengaju' = 'admin') {
   await page.getByRole('button', { name: 'Masuk ke Dashboard' }).click();
   await page.waitForURL('**/dashboard');
   if (role === 'admin') await acknowledgeAdminNotice(page);
+  await expect(page.locator('[data-chart-ready]').first()).toBeVisible();
   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
 }
 
@@ -263,6 +264,7 @@ for (const role of ['admin', 'pengaju'] as const) {
       await page.setViewportSize(viewport);
       await signIn(page, role);
       await page.evaluate(() => document.fonts.ready);
+      await expect(page.locator('[data-chart-ready] svg.recharts-surface').first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         viewport.width,
       );
