@@ -1,8 +1,13 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import { ThemedSelect } from '@/components/ui/themed-select';
 import type { RequestStatus } from '../demo/model';
 import { statusLabelMap } from '../demo/model';
+import { Field as UIField, FieldLabel, FieldError, FieldDescription } from '@/components/ui/field';
 import styles from './dashboard.module.css';
 
 export function Modal({
@@ -32,87 +37,65 @@ export function Modal({
   role?: 'dialog' | 'alertdialog';
   closeLabel?: string;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  const closeRef = useRef(onClose);
-  useEffect(() => {
-    closeRef.current = onClose;
-  }, [onClose]);
-  useLayoutEffect(() => {
-    const dialog = ref.current;
-    const previous = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    dialog?.showModal();
-    const target =
-      dialog?.querySelector<HTMLElement>('[data-initial-focus]') ??
-      dialog?.querySelector<HTMLElement>(
-        'input:not([disabled]), select:not([disabled]), textarea',
-      ) ??
-      dialog?.querySelector<HTMLElement>('button');
-    target?.focus();
-    return () => {
-      dialog?.close();
-      document.body.style.overflow = previousOverflow;
-      if (previous instanceof HTMLElement && previous.isConnected && previous !== document.body) {
-        previous.focus();
-      } else document.querySelector<HTMLElement>('main')?.focus();
-    };
-  }, []);
+  const ref = useRef<HTMLDivElement>(null);
+  const previous = useRef<HTMLElement | null>(null);
+  const Root = drawer ? Sheet : Dialog;
+  const Content = drawer ? SheetContent : DialogContent;
   return (
-    <dialog
-      ref={ref}
-      role={role}
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      className={`${styles.dialog} ${wide ? styles.wideDialog : ''} ${drawer ? styles.drawerDialog : ''} ${className ?? ''}`}
-      onCancel={(event) => {
-        event.preventDefault();
-        if (closeOnEscape) closeRef.current();
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Tab') return;
-        const controls = Array.from(
-          event.currentTarget.querySelectorAll<HTMLElement>(
-            'a[href], button, input, select, textarea, [tabindex]',
-          ),
-        ).filter(
-          (element) =>
-            element.tabIndex >= 0 &&
-            !element.matches(':disabled') &&
-            !element.closest('[inert]') &&
-            element.getClientRects().length > 0,
-        );
-        const first = controls[0];
-        const last = controls.at(-1);
-        const active = document.activeElement;
-        if (
-          (event.shiftKey && active === first) ||
-          (!event.shiftKey && active === last) ||
-          !controls.some((element) => element === active)
-        ) {
-          event.preventDefault();
-          (event.shiftKey ? last : first)?.focus();
-        }
+    <Root
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
     >
-      <header className={styles.dialogHeader}>
-        {headerIcon && <span className={styles.dialogHeaderIcon}>{headerIcon}</span>}
-        <div className={styles.dialogHeading}>
-          <h2 id={titleId}>{title}</h2>
-          {subtitle && <p className={styles.dialogSubtitle}>{subtitle}</p>}
-        </div>
-        <button
-          className={styles.iconButton}
-          type="button"
-          aria-label={closeLabel}
-          onClick={onClose}
-        >
-          <XMarkIcon aria-hidden="true" />
-        </button>
-      </header>
-      <div className={styles.dialogBody}>{children}</div>
-    </dialog>
+      <Content
+        ref={ref}
+        {...(drawer ? { side: 'left' as const } : {})}
+        role={role}
+        aria-describedby={descriptionId}
+        showCloseButton={false}
+        className={`${styles.dialog} ${wide ? styles.wideDialog : ''} ${drawer ? styles.drawerDialog : ''} ${className ?? ''}`}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          previous.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          const target =
+            ref.current?.querySelector<HTMLElement>(
+              '[data-initial-focus], input:not([disabled]), button[role="combobox"], textarea',
+            ) ?? ref.current?.querySelector<HTMLElement>('button');
+          target?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (previous.current?.isConnected && previous.current !== document.body)
+            previous.current.focus({ preventScroll: true });
+          else document.querySelector<HTMLElement>('main')?.focus({ preventScroll: true });
+        }}
+        onEscapeKeyDown={(event) => {
+          if (!closeOnEscape) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => event.preventDefault()}
+      >
+        <header className={styles.dialogHeader}>
+          {headerIcon && <span className={styles.dialogHeaderIcon}>{headerIcon}</span>}
+          <div className={styles.dialogHeading}>
+            <DialogTitle asChild>
+              <h2>{title}</h2>
+            </DialogTitle>
+            {subtitle && <p className={styles.dialogSubtitle}>{subtitle}</p>}
+          </div>
+          <button
+            className={styles.iconButton}
+            type="button"
+            aria-label={closeLabel}
+            onClick={onClose}
+          >
+            <XMarkIcon aria-hidden="true" />
+          </button>
+        </header>
+        <div className={styles.dialogBody}>{children}</div>
+      </Content>
+    </Root>
   );
 }
 
@@ -182,32 +165,30 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={styles.field}>
-      <label htmlFor={id}>{label}</label>
+    <UIField className={styles.field} data-invalid={!!error}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {children}
-      {hint && <p className={styles.hint}>{hint}</p>}
+      {hint && <FieldDescription className={styles.hint}>{hint}</FieldDescription>}
       {error && (
-        <p id={`${id}-error`} className={styles.formError} role="alert">
+        <FieldError id={`${id}-error`} className={styles.formError} role="alert">
           {error}
-        </p>
+        </FieldError>
       )}
-    </div>
+    </UIField>
   );
 }
 
 export function StatusBadge({ status }: { status: RequestStatus }) {
   return (
-    <span className={styles.statusBadge} data-status={status}>
-      <span aria-hidden="true" />
+    <Badge className={styles.statusBadge} data-status={status}>
       {statusLabelMap.get(status)}
-    </span>
+    </Badge>
   );
 }
 
 export function PageHeading({
   title,
   description,
-  eyebrow,
   action,
 }: {
   title: string;
@@ -218,7 +199,6 @@ export function PageHeading({
   return (
     <div className={styles.pageHeading}>
       <div>
-        {eyebrow && <p className={styles.pageEyebrow}>{eyebrow}</p>}
         <h1>{title}</h1>
         <p className={styles.pageDescription}>{description}</p>
       </div>
@@ -241,7 +221,6 @@ export function Pagination({
   onPageSize: (size: number) => void;
 }) {
   const pages = Math.max(1, Math.ceil(count / pageSize));
-  const sizeId = useId();
   return (
     <div className={styles.pagination}>
       <span>
@@ -249,20 +228,15 @@ export function Pagination({
         {count} data
       </span>
       <div className={styles.paginationControls}>
-        <label htmlFor={sizeId}>
-          Tampilkan{' '}
-          <select
-            id={sizeId}
-            value={pageSize}
-            onInput={(event) => onPageSize(Number(event.currentTarget.value))}
-          >
-            {[5, 10, 20].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className={styles.pageSize}>
+          <span>Tampilkan</span>
+          <ThemedSelect
+            label="Tampilkan"
+            value={String(pageSize)}
+            onValueChange={(value) => onPageSize(Number(value))}
+            options={[5, 10, 20].map((size) => ({ value: String(size), label: String(size) }))}
+          />
+        </div>
         <span>
           Halaman {page} dari {pages}
         </span>

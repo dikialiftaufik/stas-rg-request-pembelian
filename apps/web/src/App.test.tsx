@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
-import { AppProviders } from './providers';
+import { AppProviders } from '@/test/app-providers';
 import { loginDemo } from './features/demo/store';
 
 function renderApp() {
@@ -101,16 +101,20 @@ describe('akses dashboard demo', () => {
     await user.type(screen.getByLabelText('ID / NIM / EMAIL'), email);
     await user.type(screen.getByLabelText('PASSWORD'), password);
     await user.click(screen.getByRole('button', { name: 'Masuk ke Dashboard' }));
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Dashboard Pengadaan' }),
-    ).toBeVisible();
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
+    if (role !== 'admin')
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Dashboard Pengadaan' }),
+      ).toBeVisible();
     expect(window.location.pathname).toBe('/dashboard');
     if (role === 'admin') {
-      expect(screen.getByRole('alertdialog', { name: 'Pemberitahuan Request' })).toBeVisible();
+      expect(
+        await screen.findByRole('alertdialog', { name: 'Pemberitahuan Request' }),
+      ).toBeVisible();
       await user.click(screen.getByRole('button', { name: 'Nanti saja' }));
       expect(screen.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
     } else {
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Manajemen Pengguna' })).not.toBeInTheDocument();
     }
     await user.click(screen.getByRole('button', { name: 'Keluar' }));

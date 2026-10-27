@@ -5,7 +5,8 @@ import '@fontsource-variable/plus-jakarta-sans';
 import '@fontsource/jetbrains-mono/400.css';
 import './styles/globals.css';
 import { App } from './App';
-import { AppProviders } from './providers';
+import { createAppRouter } from './router';
+import { RouterProvider } from 'react-router';
 import { clientEnvironment } from './lib/environment';
 
 async function bootstrap() {
@@ -18,11 +19,11 @@ async function bootstrap() {
   if (!root) throw new Error('Elemen root frontend tidak ditemukan.');
   const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (favicon) favicon.href = logoUrl;
+
+  const router = createAppRouter(<App />);
   createRoot(root).render(
     <StrictMode>
-      <AppProviders>
-        <App />
-      </AppProviders>
+      <RouterProvider router={router} />
     </StrictMode>,
   );
 }

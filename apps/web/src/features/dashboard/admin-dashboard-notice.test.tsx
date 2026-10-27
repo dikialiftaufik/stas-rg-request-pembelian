@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '@/App';
-import { AppProviders } from '@/providers';
+import { AppProviders } from '@/test/app-providers';
 import { DEMO_STORAGE_KEY, getSnapshot, loginDemo, reloadDemoState } from '../demo/store';
 import { createSeed } from '../demo/seed';
 
@@ -27,10 +27,9 @@ describe('hard popup dashboard', () => {
       screen.getByRole('heading', { name: 'Persetujuan diperlukan: Oscilloscope Digital' }),
     ).toHaveFocus();
     expect(notice).toHaveAccessibleDescription(/Ir. Citra Dewi.*Rp 12.500.000/);
-    expect(document.body.style.overflow).toBe('hidden');
-    const cancel = new Event('cancel', { cancelable: true });
-    fireEvent(notice, cancel);
-    expect(cancel.defaultPrevented).toBe(true);
+    expect(document.body).toHaveAttribute('data-scroll-locked', '1');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(notice).toBeVisible();
     await user.click(notice);
     expect(notice).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Nanti saja' }));

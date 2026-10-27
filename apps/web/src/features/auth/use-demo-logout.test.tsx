@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { expect, it } from 'vitest';
-import { AppProviders } from '@/providers';
+import { AppProviders } from '@/test/app-providers';
 import { useDemoLogout } from './use-demo-logout';
 import { currentUser, getSnapshot, loginDemo } from '../demo/store';
 
