@@ -191,7 +191,7 @@ export default function AdminAnalytics() {
               aria-label="Grafik peta urgensi"
               data-chart-ready="true"
             >
-              <ScatterChart accessibilityLayer margin={{ left: 0, right: 16, bottom: 12 }}>
+              <ScatterChart accessibilityLayer margin={{ top: 32, left: 8, right: 20, bottom: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   type="number"
@@ -219,7 +219,13 @@ export default function AdminAnalytics() {
                   x={0}
                   stroke="var(--ui-muted)"
                   strokeDasharray="4 4"
-                  label={{ value: 'Hari ini', position: 'insideTopRight', fontSize: 11 }}
+                  label={{
+                    value: 'Hari ini',
+                    position: 'top',
+                    offset: 12,
+                    fontSize: 11,
+                    fill: 'var(--ui-ink)',
+                  }}
                 />
                 <ChartTooltip
                   content={({ active, payload }) => {
@@ -267,7 +273,7 @@ export default function AdminAnalytics() {
                           ? '■'
                           : '●'}
                   </span>
-                  {group.label}
+                  {group.label} ({urgency.filter((point) => point.group === group.key).length})
                 </li>
               ))}
             </ul>
