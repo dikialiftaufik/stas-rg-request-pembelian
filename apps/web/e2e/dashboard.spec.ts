@@ -246,7 +246,7 @@ test('pagination, logout, dan pengalihan tamu bekerja', async ({ page }) => {
   await expect(page.getByText('Halaman 2 dari 5', { exact: true })).toBeVisible();
   await choose(page, page.getByRole('combobox', { name: 'Tampilkan' }), '20');
   await expect(page.getByText('Halaman 1 dari 2', { exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'Buka profil', exact: true }).click();
+  await page.getByRole('link', { name: 'Buka profil Admin', exact: true }).click();
   await page.getByRole('main').getByRole('button', { name: 'Keluar', exact: true }).click();
   await expect(page.getByLabel('ID / NIM / EMAIL')).toBeVisible();
   await page.goto('/dashboard');

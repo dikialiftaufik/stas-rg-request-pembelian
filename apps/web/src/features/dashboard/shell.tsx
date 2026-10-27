@@ -177,7 +177,11 @@ export function DashboardShell() {
             </span>
           )}
         </Link>
-        <Link className={styles.profileButton} aria-label="Buka profil" to="/profile">
+        <Link
+          className={styles.profileButton}
+          aria-label={`Buka profil ${user.role === 'admin' ? 'Admin' : 'Pengaju'}`}
+          to="/profile"
+        >
           <span className={styles.avatar}>
             <UserIcon aria-hidden="true" />
           </span>

@@ -17,7 +17,7 @@ test('popup pertama login mengunci latar, fokus keyboard dan dapat ditutup denga
   await expect(notice).toContainText('4 request menunggu persetujuan');
   await expect(notice.locator('li')).toHaveCount(3);
   await expect(page.locator('body')).toHaveAttribute('data-scroll-locked', '1');
-  const profile = page.locator('[aria-label="Buka profil"]');
+  const profile = page.locator('[aria-label="Buka profil Admin"]');
   await profile.evaluate((element) => element.focus());
   await expect(profile).not.toBeFocused();
   await page.mouse.click(10, 10);
