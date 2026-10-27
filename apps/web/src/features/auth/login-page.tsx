@@ -7,7 +7,7 @@ import styles from './login.module.css';
 export function LoginPage() {
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = 'Masuk | STAS-RG Procurement Portal';
+    document.title = 'Masuk | STAS-RG Pembelian Barang';
     return () => {
       document.title = previousTitle;
     };
@@ -34,12 +34,12 @@ export function LoginPage() {
             kembali.
           </h1>
           <p className={styles.introduction}>
-            Masuk untuk mengelola pengadaan dan menjaga riset STAS-RG tetap bergerak.
+            Masuk untuk mengelola Pembelian Barang dan menjaga riset STAS-RG tetap bergerak.
           </p>
           <LoginForm />
         </main>
         <footer className={styles.copyright}>
-          © {new Date().getFullYear()} STAS-RG · Procurement Portal
+          © {new Date().getFullYear()} STAS-RG · Pembelian Barang
         </footer>
       </div>
       <LoginBrandPanel />

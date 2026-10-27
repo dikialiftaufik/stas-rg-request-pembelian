@@ -115,7 +115,7 @@ export function LoginForm() {
             <button
               className={styles.passwordToggle}
               type="button"
-              aria-label="Tampilkan password"
+              aria-label={passwordVisible ? 'Sembunyikan password' : 'Tampilkan password'}
               aria-pressed={passwordVisible}
               aria-controls="login-password"
               onClick={() => setPasswordVisible((visible) => !visible)}
@@ -131,11 +131,11 @@ export function LoginForm() {
         </div>
       </div>
       <Button className={styles.submit} type="submit" disabled={isPending} aria-busy={isPending}>
-        {isPending ? 'Memeriksa...' : 'Masuk ke Dashboard'}
+        {isPending ? 'Memeriksa…' : 'Masuk ke Dashboard'}
         <ArrowRightIcon aria-hidden="true" />
       </Button>
       <p className={styles.status} role="status" aria-live="polite">
-        {isPending ? 'Memeriksa akun demo...' : ''}
+        {isPending ? 'Memeriksa akun demo…' : ''}
       </p>
       {errors.root?.message && (
         <p className={styles.error} role="alert">

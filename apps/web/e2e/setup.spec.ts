@@ -9,7 +9,7 @@ test('login dapat digunakan dengan keyboard tanpa autentikasi palsu', async ({ p
     if (['fetch', 'xhr'].includes(request.resourceType())) apiRequests.push(request.url());
   });
   await page.goto('/');
-  await expect(page).toHaveTitle('Masuk | STAS-RG Procurement Portal');
+  await expect(page).toHaveTitle('Masuk | STAS-RG Pembelian Barang');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Selamat datang kembali.');
   const logo = page.getByRole('img', { name: 'STAS Research Group' });
   await expect(logo).toBeVisible();
@@ -24,7 +24,7 @@ test('login dapat digunakan dengan keyboard tanpa autentikasi palsu', async ({ p
   await expect(page.getByLabel('PASSWORD', { exact: true })).toBeFocused();
   await page.keyboard.type(' password ');
   await page.keyboard.press('Tab');
-  const toggle = page.getByRole('button', { name: 'Tampilkan password' });
+  const toggle = page.locator('button[aria-controls="login-password"]');
   await expect(toggle).toBeFocused();
   await page.keyboard.press('Space');
   await expect(page.getByLabel('PASSWORD', { exact: true })).toHaveAttribute('type', 'text');

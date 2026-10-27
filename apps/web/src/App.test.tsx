@@ -17,7 +17,7 @@ describe('halaman login', () => {
   it('menampilkan form dengan password tersembunyi dan tanpa error awal', () => {
     renderApp();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Selamat datang kembali.');
-    expect(document.title).toBe('Masuk | STAS-RG Procurement Portal');
+    expect(document.title).toBe('Masuk | STAS-RG Pembelian Barang');
     expect(screen.getByRole('img', { name: 'STAS Research Group' })).toBeVisible();
     expect(screen.getByLabelText('ID / NIM / EMAIL')).toHaveAttribute('autocomplete', 'username');
     expect(screen.getByLabelText('PASSWORD')).toHaveAttribute('type', 'password');

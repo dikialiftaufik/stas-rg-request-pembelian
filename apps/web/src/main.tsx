@@ -1,3 +1,4 @@
+import logoUrl from '../../../assets/img/logo-stas-rg.png';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/plus-jakarta-sans';
@@ -15,6 +16,8 @@ async function bootstrap() {
 
   const root = document.getElementById('root');
   if (!root) throw new Error('Elemen root frontend tidak ditemukan.');
+  const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (favicon) favicon.href = logoUrl;
   createRoot(root).render(
     <StrictMode>
       <AppProviders>
