@@ -4,7 +4,8 @@ import {
   trendAnalytics,
   lastEightWeeks,
   urgencyAnalytics,
-  personalAgenda,
+  personalFollowup,
+  personalReceiptTrend,
   dayDifference,
 } from './analytics';
 import { datePresets, inDateRange, readDateRange } from './date-range';
@@ -90,24 +91,64 @@ describe('WIB periods and analytics', () => {
     expect(points[1]?.days).toBe(points[2]?.days);
     expect(urgencyAnalytics(data, 'weather', now)).toEqual([]);
   });
-  it('keeps personal agenda private and separates overdue and out-of-range requests', () => {
-    const data = createSeed();
+  it('ranks only owned active requests by age and supports status filtering', () => {
+    const data = createSeed(now);
     const source = data.requests[0]!;
     const user = data.users.find((person) => person.id === 'demo-pengaju')!;
     data.requests = [
-      { ...source, id: 'past', requiredDate: '2026-10-25' },
-      { ...source, id: 'soon', requiredDate: '2026-10-29' },
-      { ...source, id: 'far', requiredDate: '2027-02-01' },
-      { ...source, id: 'other', ownerId: 'hasan', requiredDate: '2026-10-29' },
-      { ...source, id: 'done', status: 'completed' },
+      { ...source, id: 'recent', createdAt: '2026-10-25T17:00:00Z' },
+      { ...source, id: 'old', createdAt: '2026-10-20T16:59:59Z', status: 'ordered' },
+      { ...source, id: 'other', ownerId: 'hasan' },
+      { ...source, id: 'done', status: 'delivered' },
+      { ...source, id: 'deleted', deleted: true },
     ];
-    const { buckets, outside } = personalAgenda(data, user, 4, now);
-    expect(buckets[0]?.requests.map((row) => row.id)).toEqual(['past']);
-    expect(buckets.flatMap((bucket) => bucket.requests.map((row) => row.id))).toEqual([
-      'past',
-      'soon',
+    expect(personalFollowup(data, user, '', now).map((row) => [row.id, row.age])).toEqual([
+      ['old', 6],
+      ['recent', 0],
     ]);
-    expect(outside).toBe(1);
+    expect(personalFollowup(data, user, 'ordered', now).map((row) => row.id)).toEqual(['old']);
+  });
+  it('counts receipts once from recorded dates, zero-fills weeks, and excludes other users', () => {
+    const data = createSeed(now);
+    const source = data.requests[0]!;
+    const user = data.users.find((person) => person.id === 'demo-pengaju')!;
+    const received = {
+      from: 'in_transit' as const,
+      to: 'delivered' as const,
+      actorId: 'demo-admin',
+      at: '2026-10-25T17:00:00Z',
+      reason: '',
+    };
+    data.requests = [
+      {
+        ...source,
+        id: 'received',
+        status: 'completed',
+        createdAt: '2026-10-19T08:00:00Z',
+        statusHistory: [received, received],
+      },
+      { ...source, id: 'legacy', status: 'delivered', statusHistory: [] },
+      { ...source, id: 'other', ownerId: 'hasan', statusHistory: [received] },
+      { ...source, id: 'deleted', deleted: true, statusHistory: [received] },
+    ];
+    const result = personalReceiptTrend(data, user, 4, now);
+    expect(result.buckets).toHaveLength(4);
+    expect(result.buckets[0]?.submissions).toBe(0);
+    expect(result.buckets.at(-1)).toMatchObject({
+      from: '2026-10-26',
+      to: '2026-10-26',
+      receipts: 1,
+      partial: true,
+    });
+    expect(result.buckets.flatMap((bucket) => bucket.received.map((row) => row.id))).toEqual([
+      'received',
+    ]);
+    expect(result.missingReceiptDates).toBe(1);
+    expect(
+      personalReceiptTrend({ ...data, requests: [] }, user, 8, now).buckets.every(
+        (bucket) => bucket.submissions === 0 && bucket.receipts === 0,
+      ),
+    ).toBe(true);
   });
   it('redirects old URLs while preserving filters and RAB source', () => {
     const target = new URL(

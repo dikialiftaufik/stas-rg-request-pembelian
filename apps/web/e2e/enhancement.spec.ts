@@ -44,21 +44,50 @@ test('periode tren, nama bulan dan peta urgensi memakai data serta URL independe
   await expect(page.getByRole('heading', { level: 1, name: 'Oscilloscope Digital' })).toBeVisible();
   expect(errors).toEqual([]);
 });
-test('agenda Pengaju dinamis, interaktif dan tidak menampilkan barang orang lain', async ({
+test('grafik Pengaju menyaring data pribadi dan mempertahankan pilihan periode', async ({
   page,
 }) => {
   await login(page, 'pengaju');
-  const section = page.getByRole('region', { name: 'Analitik kebutuhan pribadi' });
-  await expect(section.getByRole('heading', { name: 'Kebutuhan barang saya' })).toBeVisible();
-  await section.getByLabel('Rentang agenda').click();
-  await page.getByRole('option', { name: '8 minggu mendatang', exact: true }).click();
-  await expect(page).toHaveURL(/agendaWeeks=8/);
-  await choose(page, section.getByLabel('Status agenda'), 'pending_review');
-  const agenda = page.getByRole('region', { name: 'Agenda barang terpilih' });
-  await expect(agenda.getByRole('link', { name: 'Spektrofotometer UV-Vis' })).toHaveCount(0);
-  await expect(agenda.getByRole('link', { name: 'Oscilloscope Digital' })).toBeVisible();
+  const section = page.getByRole('region', { name: 'Analitik pengajuan pribadi' });
+  await expect(
+    section.getByRole('heading', { name: 'Request yang perlu ditindaklanjuti' }),
+  ).toBeVisible();
+  await expect(
+    section.getByRole('heading', { name: 'Tren pengajuan dan penerimaan' }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Kebutuhan barang saya' })).toHaveCount(0);
+  await choose(page, section.getByLabel('Status tindak lanjut'), 'pending_review');
+  await section.getByText('Lihat daftar tindak lanjut', { exact: true }).click();
+  const table = section.getByRole('table', {
+    name: 'Request aktif milik Anda berdasarkan usia pengajuan',
+  });
+  await expect(table.getByRole('link', { name: 'Oscilloscope Digital' })).toBeVisible();
+  await expect(table.getByRole('link', { name: 'Spektrofotometer UV-Vis' })).toHaveCount(0);
+  await section.getByLabel('Periode tren pribadi').click();
+  await page.getByRole('option', { name: '4 minggu terakhir', exact: true }).click();
+  await expect(page).toHaveURL(/personalWeeks=4/);
   await page.reload();
-  await expect(page.getByLabel('Status agenda')).toContainText('Menunggu Persetujuan');
+  await expect(page.getByLabel('Status tindak lanjut')).toContainText('Menunggu Persetujuan');
+  await expect(page.getByLabel('Periode tren pribadi')).toContainText('4 minggu terakhir');
+  const trend = page.getByRole('group', {
+    name: 'Grafik tren pengajuan dan penerimaan',
+    exact: true,
+  });
+  await expect(trend.locator('svg.recharts-surface')).toBeVisible();
+  await page.screenshot({ path: '.turbo/purchase-finish/pengaju-charts.png', fullPage: true });
+  await trend
+    .getByRole('button', { name: /^Lihat pengajuan minggu/ })
+    .first()
+    .click();
+  await expect(page).toHaveURL(/personalWeek=/);
+  await expect(page.getByRole('region', { name: 'Barang pada minggu terpilih' })).toBeVisible();
+  const firstWeek = page.url();
+  await trend
+    .getByRole('button', { name: /^Lihat pengajuan minggu/ })
+    .last()
+    .focus();
+  await page.keyboard.press('Enter');
+  await expect(page).not.toHaveURL(firstWeek);
   await page.goto('/requests/request-2/invoice');
   await expect(
     page.getByRole('heading', { level: 1, name: 'Request tidak tersedia' }),
@@ -66,6 +95,7 @@ test('agenda Pengaju dinamis, interaktif dan tidak menampilkan barang orang lain
   await page.goto('/requests/request-1/delivery');
   await expect(page.getByRole('heading', { level: 1, name: 'Akses ditolak' })).toBeVisible();
 });
+
 test('halaman form menjaga perubahan dan mengembalikan konteks daftar', async ({ page }) => {
   await login(page);
   await page.goto('/requests?status=approved&page=2&sortBy=item&sortDir=asc');
@@ -211,7 +241,7 @@ test('perubahan belum disimpan terlindungi saat Back dan refresh', async ({ page
   expect(errors).toEqual([]);
 });
 
-test('titik urgensi dan batang agenda membuka informasi terkait', async ({ page }) => {
+test('titik urgensi dan batang tindak lanjut membuka informasi terkait', async ({ page }) => {
   await login(page);
   await page.locator('.recharts-scatter-symbol').first().click();
   await expect(page).toHaveURL(/requests\/request-/);
@@ -227,9 +257,8 @@ test('titik urgensi dan batang agenda membuka informasi terkait', async ({ page 
   );
   expect(target).toBeGreaterThanOrEqual(0);
   await bars.nth(target).click();
-  await expect(page).toHaveURL(/agenda=/);
-  await expect(page).toHaveURL(/agendaStatus=/);
-  await expect(page.getByRole('region', { name: 'Agenda barang terpilih' })).toBeVisible();
+  await expect(page).toHaveURL(/requests\/request-/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
 test.describe('sentuhan dan teks besar', () => {

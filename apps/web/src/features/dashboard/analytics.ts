@@ -113,7 +113,29 @@ export function urgencyAnalytics(data: DemoSnapshot, researchId = '', now = new 
     );
 }
 export type UrgencyPoint = ReturnType<typeof urgencyAnalytics>[number];
-export function personalAgenda(
+export function personalFollowup(
+  data: DemoSnapshot,
+  user: DemoUser,
+  status = '',
+  now = new Date(),
+) {
+  const today = wibDay(now);
+  return scopedRequests(data, user)
+    .filter(
+      (request) =>
+        activeStatuses.includes(request.status) && (!status || request.status === status),
+    )
+    .map((request) => ({
+      ...request,
+      age: Math.max(0, dayDifference(wibDay(request.createdAt), today)),
+      value: requestTotal(request).toNumber(),
+    }))
+    .toSorted(
+      (a, b) =>
+        b.age - a.age || a.requiredDate.localeCompare(b.requiredDate) || a.id.localeCompare(b.id),
+    );
+}
+export function personalReceiptTrend(
   data: DemoSnapshot,
   user: DemoUser,
   weeks: number,
@@ -121,35 +143,43 @@ export function personalAgenda(
 ) {
   const today = wibDay(now);
   const monday = mondayOf(today);
-  const requests = scopedRequests(data, user).filter((request) =>
-    activeStatuses.includes(request.status),
-  );
-  const definitions = [
-    { key: 'overdue', label: 'Terlambat', from: '', to: shiftDay(today, -1) },
-    ...Array.from({ length: weeks }, (_, index) => {
-      const start = shiftDay(monday, index * 7);
-      return {
-        key: start,
-        label: shortDate(start < today ? today : start),
-        from: start < today ? today : start,
-        to: shiftDay(start, 6),
-      };
-    }),
-  ];
-  const buckets = definitions.map((bucket) => {
-    const rows = requests.filter(
-      (request) => request.requiredDate >= bucket.from && request.requiredDate <= bucket.to,
+  const requests = scopedRequests(data, user);
+  const receipts = requests.flatMap((request) => {
+    const received = request.statusHistory.find((change) => change.to === 'delivered');
+    return received && received.at <= now.toISOString()
+      ? [{ request, day: wibDay(received.at) }]
+      : [];
+  });
+  const buckets = Array.from({ length: weeks }, (_, index) => {
+    const from = shiftDay(monday, (index - weeks + 1) * 7);
+    const end = shiftDay(from, 6);
+    const to = end < today ? end : today;
+    const submitted = requests.filter(
+      (request) => wibDay(request.createdAt) >= from && wibDay(request.createdAt) <= to,
     );
+    const received = receipts
+      .filter((receipt) => receipt.day >= from && receipt.day <= to)
+      .map((receipt) => receipt.request);
     return {
-      ...bucket,
-      requests: rows,
-      pending_review: rows.filter((row) => row.status === 'pending_review').length,
-      approved: rows.filter((row) => row.status === 'approved').length,
-      ordered: rows.filter((row) => row.status === 'ordered').length,
-      in_transit: rows.filter((row) => row.status === 'in_transit').length,
-      value: rows.reduce((sum, row) => sum.plus(requestTotal(row)), new Decimal(0)).toNumber(),
+      from,
+      to,
+      label: shortDate(from),
+      partial: end > today,
+      submitted,
+      received,
+      submissions: submitted.length,
+      receipts: received.length,
+      value: submitted
+        .reduce((sum, request) => sum.plus(requestTotal(request)), new Decimal(0))
+        .toNumber(),
     };
   });
-  const end = definitions.at(-1)?.to ?? today;
-  return { buckets, outside: requests.filter((request) => request.requiredDate > end).length };
+  return {
+    buckets,
+    missingReceiptDates: requests.filter(
+      (request) =>
+        ['delivered', 'completed'].includes(request.status) &&
+        !request.statusHistory.some((change) => change.to === 'delivered'),
+    ).length,
+  };
 }
