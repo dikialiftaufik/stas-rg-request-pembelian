@@ -3,6 +3,7 @@ import { DateRangePicker } from './date-range-picker';
 import { inDateRange, readDateRange } from './date-range';
 import { PartyHeader } from './party-header';
 import { InvoiceCell } from './invoice';
+import { SubmissionStatusCell } from './submission-status';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ const columns = [
   ['quantity', 'Jumlah'],
   ['total', 'Total'],
   ['status', 'Status'],
+  ['submissionStatus', 'Status pengajuan'],
   ['createdAt', 'Diajukan'],
   ['invoice', 'Invoice'],
 ] as const;
@@ -282,6 +284,9 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
                   <td className={styles.money}>{formatMoney(requestTotal(request))}</td>
                   <td>
                     <StatusBadge status={request.status} />
+                  </td>
+                  <td>
+                    <SubmissionStatusCell request={request} />
                   </td>
                   <td className={styles.dateCell}>{formatDate(request.createdAt)}</td>
                   <td>

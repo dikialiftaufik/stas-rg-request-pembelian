@@ -28,6 +28,7 @@ import { useDemoLogout } from '../auth/use-demo-logout';
 import { RequestEditor, ResearchEditor, UserEditor } from './editors';
 import { RequestStatusEditor } from './request-status-editor';
 import { InvoiceContent } from './invoice';
+import { SubmissionStatusCell } from './submission-status';
 import { RabDetails } from './rab-list';
 import { RabImporter } from './rab-import';
 import { Field, StatusBadge } from './shared';
@@ -396,7 +397,16 @@ export function RequestRecordPage({
               <dd>{value}</dd>
             </div>
           ))}
+          <div>
+            <dt>Status pengajuan</dt>
+            <dd>
+              <SubmissionStatusCell request={request} />
+            </dd>
+          </div>
         </dl>
+        <p className={styles.hint}>
+          Status pengajuan dicatat Admin, terpisah dari tahapan pembelian barang.
+        </p>
         {request.url && (
           <a className={styles.textLink} href={request.url} target="_blank" rel="noreferrer">
             Buka tautan barang

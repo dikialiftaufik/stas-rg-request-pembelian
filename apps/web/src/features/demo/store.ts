@@ -7,6 +7,7 @@ import {
   researchUsed,
   validateRequestDate,
   statusSchema,
+  submissionStatusSchema,
   statusLabelMap,
   invoiceSchema,
   invoiceInputSchema,
@@ -24,6 +25,7 @@ import type {
   RabDocument,
   RabItemInput,
   FulfillmentInput,
+  SubmissionStatus,
 } from './model';
 import { createSeed, demoAccounts } from './seed';
 import { allowedNextStatuses } from './request-workflow';
@@ -186,6 +188,7 @@ export function saveRequest(
         id: crypto.randomUUID(),
         ownerId: user.id,
         status: 'pending_review' as const,
+        submissionStatus: 'not_submitted' as const,
         createdAt: new Date().toISOString(),
         deleted: false,
         statusHistory: [],
@@ -260,6 +263,31 @@ export function cancelRequest(id: string) {
       id,
       `${request.item} dibatalkan oleh Pengaju.`,
     ),
+  );
+}
+
+export function changeSubmissionStatus(input: {
+  id: string;
+  expectedStatus: SubmissionStatus;
+  nextStatus: SubmissionStatus;
+}) {
+  requireUser(true);
+  const request = visibleRequest(input.id);
+  const nextStatus = submissionStatusSchema.parse(input.nextStatus);
+  if (request.submissionStatus !== input.expectedStatus)
+    throw new Error(
+      'Status pengajuan sudah berubah. Tutup pilihan lalu buka kembali untuk melihat nilai terbaru.',
+    );
+  if (request.submissionStatus === nextStatus) return;
+  const data = getSnapshot();
+  publish(
+    {
+      ...data,
+      requests: data.requests.map((item) =>
+        item.id === request.id ? { ...item, submissionStatus: nextStatus } : item,
+      ),
+    },
+    true,
   );
 }
 

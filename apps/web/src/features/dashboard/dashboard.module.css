@@ -1336,6 +1336,16 @@
   gap: 4px;
   min-width: 108px;
 }
+.submissionTrigger {
+  min-height: 34px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .submissionTrigger {
+    min-height: 44px;
+  }
+}
 .invoiceUpload {
   border: 1px dashed var(--ui-border);
   border-radius: 6px;

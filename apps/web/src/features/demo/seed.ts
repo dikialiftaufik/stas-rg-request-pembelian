@@ -186,6 +186,7 @@ export function createSeed(now = new Date()): DemoSnapshot {
       rabItemId: null,
       unitPrice: prices.at(index) ?? (index === 23 ? '10500000' : '4500000'),
       status,
+      submissionStatus: 'not_submitted',
       requiredDate: day(deadlines.at(index) ?? 14),
       url: '',
       notes: 'Data contoh untuk demonstrasi frontend.',

@@ -1,5 +1,5 @@
 import type { DemoRequest, DemoSnapshot, DemoUser } from '../demo/model';
-import { requestTotal, statusLabelMap } from '../demo/model';
+import { requestTotal, statusLabelMap, submissionStatusLabels } from '../demo/model';
 
 export type SortDirection = 'asc' | 'desc';
 export const requestColumns = [
@@ -9,6 +9,7 @@ export const requestColumns = [
   'quantity',
   'total',
   'status',
+  'submissionStatus',
   'createdAt',
   'invoice',
 ] as const;
@@ -82,6 +83,8 @@ export function sortRequests(
         return research.get(row.researchId) ?? '';
       case 'invoice':
         return row.invoice?.file?.name ?? row.invoice?.url ?? '';
+      case 'submissionStatus':
+        return submissionStatusLabels[row.submissionStatus];
       case 'status':
         return statusLabelMap.get(row.status) ?? '';
       default:

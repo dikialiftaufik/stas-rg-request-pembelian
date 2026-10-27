@@ -3,6 +3,11 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { z } from 'zod';
 
 export const roleSchema = z.enum(['admin', 'pengaju']);
+export const submissionStatusSchema = z.enum(['not_submitted', 'submitted']);
+export const submissionStatusLabels = {
+  not_submitted: 'Belum diajukan',
+  submitted: 'Sudah diajukan',
+} as const;
 export const statusSchema = z.enum([
   'pending_review',
   'approved',
@@ -165,6 +170,7 @@ export const requestSchema = requestInputSchema.extend({
   rabDocumentId: z.string().nullable().default(null),
   rabItemId: z.string().nullable().default(null),
   status: statusSchema,
+  submissionStatus: submissionStatusSchema.default('not_submitted'),
   createdAt: z.iso.datetime(),
   deleted: z.boolean(),
   statusHistory: z.array(statusChangeSchema).default([]),
@@ -221,6 +227,7 @@ export const snapshotSchema = z
 
 export type DemoRole = z.infer<typeof roleSchema>;
 export type RequestStatus = z.infer<typeof statusSchema>;
+export type SubmissionStatus = z.infer<typeof submissionStatusSchema>;
 export type RequestStatusChange = z.infer<typeof statusChangeSchema>;
 export type DemoUser = z.infer<typeof userSchema>;
 export type DemoResearch = z.infer<typeof researchSchema>;

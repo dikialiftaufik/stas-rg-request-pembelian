@@ -125,7 +125,8 @@ textarea {
   text-overflow: ellipsis;
 }
 [data-slot='select-item'],
-[data-slot='dropdown-menu-item'] {
+[data-slot='dropdown-menu-item'],
+[data-slot='dropdown-menu-radio-item'] {
   min-height: 34px;
 }
 [data-slot='select-content'],
@@ -136,7 +137,8 @@ textarea {
 }
 @media (pointer: coarse) {
   [data-slot='select-item'],
-  [data-slot='dropdown-menu-item'] {
+  [data-slot='dropdown-menu-item'],
+  [data-slot='dropdown-menu-radio-item'] {
     min-height: 44px;
   }
 }

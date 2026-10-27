@@ -1,6 +1,6 @@
 import type { DateRangeValue } from './date-range';
 import type { DemoRequest, DemoSnapshot } from '../demo/model';
-import { requestTotal, statusLabels } from '../demo/model';
+import { requestTotal, statusLabels, submissionStatusLabels } from '../demo/model';
 import { currentUser } from '../demo/store';
 import { wibDay } from './date-range';
 
@@ -30,6 +30,7 @@ export async function buildRequestWorkbook(
     { header: 'Tanggal Pengajuan (WIB)', key: 'submittedDate', width: 24 },
     { header: 'Total invoice (Rp)', key: 'invoiceAmount', width: 22 },
     { header: 'Tanggal invoice', key: 'invoiceDate', width: 22 },
+    { header: 'Status pengajuan', key: 'submissionStatus', width: 22 },
   ];
   rows.forEach((row) =>
     sheet.addRow({
@@ -47,6 +48,7 @@ export async function buildRequestWorkbook(
       submittedDate: wibDay(row.createdAt),
       invoiceAmount: row.invoice?.amount ? Number(row.invoice.amount) : null,
       invoiceDate: row.invoice?.invoiceDate ?? '',
+      submissionStatus: submissionStatusLabels[row.submissionStatus],
     }),
   );
   sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -54,7 +56,7 @@ export async function buildRequestWorkbook(
   sheet.getColumn('unitPrice').numFmt = '#,##0.00';
   sheet.getColumn('invoiceAmount').numFmt = '#,##0.00';
   sheet.getColumn('total').numFmt = '#,##0.00';
-  sheet.autoFilter = { from: 'A1', to: 'N1' };
+  sheet.autoFilter = { from: 'A1', to: 'O1' };
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   const info = workbook.addWorksheet('Informasi ekspor');
   info.addRows([
