@@ -12,6 +12,7 @@ export default tseslint.config(
   {
     ignores: [
       'dist/**',
+      '.turbo/**',
       'coverage/**',
       'playwright-report/**',
       'test-results/**',

@@ -6,6 +6,28 @@
 }
 
 :root {
+  --ui-canvas: #f3f5ef;
+  --ui-surface: #ffffff;
+  --ui-sage: #e8efe5;
+  --ui-sidebar: #f9faf6;
+  --ui-ink: #18392f;
+  --ui-muted: #5d6c63;
+  --ui-primary: #176b43;
+  --ui-primary-hover: #115333;
+  --ui-border: #d6dfd3;
+  --ui-hover: #edf2e9;
+  --ui-danger: #b42318;
+  --ui-danger-soft: #fff0ed;
+  --ui-radius: 10px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-text-body: 0.875rem;
+  --ui-text-small: 0.75rem;
+  --ui-text-label: 0.8125rem;
+  --ui-text-title: 1.75rem;
+  --ui-control-height: 38px;
+  --ui-icon-target: 32px;
+  --ui-shadow-overlay: 0 16px 48px rgb(24 57 47 / 18%);
   font-family: var(--font-sans);
   color-scheme: light;
   font-synthesis: none;
@@ -19,4 +41,156 @@ body {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--ui-canvas);
+  color: var(--ui-ink);
+}
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+input,
+textarea {
+  caret-color: var(--ui-primary);
+}
+::selection {
+  background: #d4e5cd;
+  color: #18392f;
+}
+:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 3px;
+}
+[data-sonner-toaster] {
+  font-family: var(--font-sans) !important;
+}
+[data-sonner-toast] {
+  --normal-bg: var(--ui-surface);
+  --normal-text: var(--ui-ink);
+  --normal-border: var(--ui-border);
+  font-size: 0.875rem !important;
+}
+@media (pointer: coarse) {
+  :root {
+    --ui-control-height: 44px;
+    --ui-icon-target: 44px;
+  }
+}
+
+@theme inline {
+  --color-background: var(--ui-surface);
+  --color-foreground: var(--ui-ink);
+  --color-card: var(--ui-surface);
+  --color-card-foreground: var(--ui-ink);
+  --color-popover: var(--ui-surface);
+  --color-popover-foreground: var(--ui-ink);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: #fff;
+  --color-secondary: var(--ui-sage);
+  --color-secondary-foreground: var(--ui-ink);
+  --color-muted: var(--ui-canvas);
+  --color-muted-foreground: var(--ui-muted);
+  --color-accent: var(--ui-hover);
+  --color-accent-foreground: var(--ui-ink);
+  --color-destructive: var(--ui-danger);
+  --color-border: var(--ui-border);
+  --color-input: #b8c7b3;
+  --color-ring: var(--ui-primary);
+  --color-export: #30463b;
+}
+[data-slot='select-trigger'] {
+  min-height: var(--ui-control-height);
+  width: 100%;
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+[data-slot='select-content'] {
+  max-width: min(480px, calc(100vw - 24px));
+}
+[data-slot='select-item'] > span:last-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+[data-slot='select-value'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-slot='select-item'],
+[data-slot='dropdown-menu-item'] {
+  min-height: 34px;
+}
+[data-slot='select-content'],
+[data-slot='dropdown-menu-content'],
+[data-slot='popover-content'] {
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow-overlay);
+}
+@media (pointer: coarse) {
+  [data-slot='select-item'],
+  [data-slot='dropdown-menu-item'] {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+:root {
+  --ui-export: #176b43;
+  --ui-chart-urgent: #a65b17;
+  --ui-chart-soon: #718a59;
+  --ui-chart-ordered: #426b83;
+}
+.date-range-popover {
+  max-width: calc(100vw - 24px);
+  max-height: var(--radix-popover-content-available-height);
+  overflow: auto;
+}
+.date-range-sheet {
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  gap: 0;
+  padding: 0;
+  border-radius: 12px 12px 0 0;
+}
+@media (max-width: 639px) {
+  .date-range-popover {
+    width: min(340px, calc(100vw - 24px));
+  }
+}
+[data-slot='dialog-overlay'],
+[data-slot='sheet-overlay'] {
+  background: rgb(20 38 29 / 38%);
+}
+
+/* Keep toast text at full contrast throughout entrance and exit. */
+[data-sonner-toaster] [data-sonner-toast] {
+  transition-property: transform, box-shadow;
+}
+@media (pointer: coarse) {
+  [data-sonner-toaster] [data-sonner-toast] {
+    padding-right: 48px;
+  }
+  [data-sonner-toaster] [data-close-button] {
+    min-width: 44px;
+    min-height: 44px;
+    top: 0;
+    left: auto;
+    right: 0;
+    transform: none;
+    border: 0;
+    background: transparent;
+  }
 }
