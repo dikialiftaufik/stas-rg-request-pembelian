@@ -6,9 +6,19 @@ import {
   requestTotal,
   researchUsed,
   validateRequestDate,
+  statusSchema,
+  statusLabelMap,
 } from './model';
-import type { DemoSnapshot, DemoUser, RequestInput, UserInput, ResearchInput } from './model';
+import type {
+  DemoSnapshot,
+  DemoUser,
+  RequestInput,
+  UserInput,
+  ResearchInput,
+  RequestStatus,
+} from './model';
 import { createSeed, demoAccounts } from './seed';
+import { allowedNextStatuses } from './request-workflow';
 
 export const DEMO_STORAGE_KEY = 'stas-rg-demo-v1';
 let snapshot: DemoSnapshot | undefined;
@@ -170,7 +180,22 @@ export function cancelRequest(id: string) {
       {
         ...data,
         requests: data.requests.map((item) =>
-          item.id === id ? { ...item, status: 'cancelled' as const } : item,
+          item.id === id
+            ? {
+                ...item,
+                status: 'cancelled' as const,
+                statusHistory: [
+                  ...item.statusHistory,
+                  {
+                    from: item.status,
+                    to: 'cancelled' as const,
+                    actorId: user.id,
+                    at: new Date().toISOString(),
+                    reason: 'Dibatalkan oleh Pengaju.',
+                  },
+                ],
+              }
+            : item,
         ),
       },
       'demo-admin',
@@ -179,7 +204,6 @@ export function cancelRequest(id: string) {
     ),
   );
 }
-
 export function saveUser(input: UserInput, id?: string) {
   requireUser(true);
   const values = userInputSchema.parse(input);
@@ -277,4 +301,56 @@ export function dashboardSummary(data: DemoSnapshot, user: DemoUser) {
       requestTotal({ quantity: 0, unitPrice: '0' }),
     ),
   };
+}
+
+export async function changeRequestStatus(input: {
+  id: string;
+  expectedStatus: RequestStatus;
+  nextStatus: RequestStatus;
+  reason?: string;
+}) {
+  const user = requireUser(true);
+  const request = visibleRequest(input.id);
+  const nextStatus = statusSchema.parse(input.nextStatus);
+  if (request.status !== input.expectedStatus)
+    throw new Error(
+      'Status sudah berubah. Tutup lalu buka kembali form untuk melihat status terbaru.',
+    );
+  if (!allowedNextStatuses(request.status).includes(nextStatus))
+    throw new Error('Perubahan status tidak diizinkan. Pilih tahapan berikutnya yang tersedia.');
+  const reason = input.reason?.trim() ?? '';
+  if (nextStatus === 'rejected' && !reason)
+    throw new Error('Jelaskan alasan penolakan agar Pengaju dapat menindaklanjuti.');
+  const updated = {
+    ...request,
+    status: nextStatus,
+    statusHistory: [
+      ...request.statusHistory,
+      {
+        from: request.status,
+        to: nextStatus,
+        actorId: user.id,
+        at: new Date().toISOString(),
+        reason,
+      },
+    ],
+  };
+  const data = getSnapshot();
+  const next = {
+    ...data,
+    requests: data.requests.map((item) => (item.id === request.id ? updated : item)),
+  };
+  const research = data.research.find((item) => item.id === request.researchId);
+  if (!research || researchUsed(next, research.id).gt(research.allocated))
+    throw new Error(
+      'Alokasi dana riset tidak mencukupi. Periksa alokasi sebelum menyetujui request.',
+    );
+  publish(
+    notification(
+      next,
+      request.ownerId,
+      request.id,
+      `${request.item}: ${statusLabelMap.get(nextStatus)}.${reason ? ` ${reason}` : ''}`,
+    ),
+  );
 }
