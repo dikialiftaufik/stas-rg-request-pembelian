@@ -88,7 +88,7 @@ Select, menu, kalender dan dialog memakai komponen registry resmi @shadcn/Radix 
 
 Kolom Pengaju/riset menyusun nama utama dan riset pendukung dalam satu sel; menu header menyediakan A–Z/Z–A untuk keduanya. Badge status menggunakan label tanpa titik dekoratif. Invoice mempunyai kolom tersendiri, Aksi tetap sticky. Ekspor dan impor memakai varian hijau yang sama, dibedakan oleh ikon serta label.
 
-Chart Admin menjawab tren nilai dan urgensi kebutuhan; chart Pengaju membantu agenda mingguan. Kontainer stabil, dengan tooltip, legenda, bentuk penanda urgensi dan alternatif tabel. Dua kolom Admin menjadi satu pada layar kecil.
+Chart Admin menjawab tren nilai dan urgensi kebutuhan; chart Pengaju memisahkan tindak lanjut barang dari tren pemenuhan. Kontainer stabil, dengan tooltip, legenda, bentuk penanda urgensi dan alternatif tabel. Dua kolom kedua peran menjadi satu pada layar kecil.
 
 Rentang tanggal berupa Popover dengan preset dan kalender, kontrol Dari/Sampai, Terapkan/Batal dan hapus rentang. Desktop menempatkan preset di samping; mobile menyusunnya di atas kalender dalam Sheet dari bawah, dengan tombol aksi tetap terjangkau. Perubahan hanya berlaku setelah Terapkan. Pengurutan, filter dan periode mengembalikan pagination ke awal tanpa toast.
 
@@ -102,7 +102,11 @@ Gunakan ikon Heroicons 16–18 px, nilai aktual, empty state yang menjelaskan la
 
 Form dan detail berada pada halaman: breadcrumb, tombol kembali, judul, kartu utama dan ringkasan kanan. Lebar maksimal 1.280 px; kolom 2:1 pada desktop dan satu kolom di bawah 1.024 px. Card, Field, Breadcrumb dan AlertDialog berasal dari registry resmi shadcn Radix, dengan token serta Heroicons proyek. Tombol ekspor dan impor menggunakan varian primary yang sama.
 
-Tren nilai memakai label bulan Indonesia, rentang WIB dan agregasi adaptif: harian hingga 31 hari, mingguan hingga 180 hari, lalu bulanan. Periode tepi diberi keterangan. Peta urgensi memetakan sisa hari terhadap nominal; empat kelompok menggunakan bentuk dan warna, dengan daftar prioritas untuk titik bertumpuk. Agenda Pengaju menggunakan batang bertumpuk menurut minggu kebutuhan dan tahap aktif. Setiap chart menyediakan tooltip, tabel data dan alternatif interaksi keyboard.
+Tren nilai memakai label bulan Indonesia, rentang WIB dan agregasi adaptif: harian hingga 31 hari, mingguan hingga 180 hari, lalu bulanan. Periode tepi diberi keterangan. Peta urgensi memetakan sisa hari terhadap nominal; empat kelompok menggunakan bentuk dan warna, dengan jumlah per kelompok serta daftar prioritas untuk titik bertumpuk. Label Hari ini memakai ruang atas plot tersendiri agar tidak berimpit dengan nominal.
+
+Pengaju memakai grafik batang horizontal usia pengajuan di kiri, maksimal delapan barang aktif terlama; nama lengkap dan seluruh hasil tersedia pada tabel. Grafik garis di kanan membandingkan request diajukan dan diterima, dengan garis solid dan putus-putus agar tidak bergantung pada warna. Sumbu jumlah memakai nol dan batas atas sesuai data. Periode memakai minggu Senin–Minggu WIB dan label bulan Indonesia; minggu berjalan ditandai belum lengkap. Klik titik atau tombol tabel memilih minggu; klik batang atau tautan tabel membuka detail barang. Titik memiliki nama aksesibel, fokus terlihat dan aktivasi Enter/Space. Kontainer grafik dan empty state mempunyai tinggi yang sama.
+
+Riset perwakilan ditampilkan sebagai konteks baca pada ringkasan form, tanpa dropdown riset untuk Pengaju. Pemilihan sumber RAB membuka dropdown dokumen dan barang secara bertahap. Barang serta satuan dari sumber menjadi read-only; harga dan jumlah tetap bisa dikoreksi. Validasi submit memfokuskan dokumen atau barang yang belum dipilih, lalu field lain yang salah. Profil Pengaju memakai dropdown satu riset. Katalog dummy memakai penanda Contoh unggahan Admin; sumber impor pengguna dipertahankan.
 
 Detail barang menghubungkan ringkasan nilai, invoice, sumber RAB, pengiriman, serta linimasa enam tahap. Linimasa horizontal menjadi vertikal pada mobile. Nominal invoice merupakan data dokumen, terpisah dari nilai request dan komitmen. Tanggal yang tidak tersedia ditampilkan sebagai belum dilengkapi. Informasi kurir/resi tidak menyiratkan integrasi pelacakan otomatis.
 

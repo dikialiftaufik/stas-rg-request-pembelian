@@ -8,7 +8,7 @@ Web, berbahasa Indonesia. Desktop untuk pekerjaan Pembelian Barang dan mobile un
 
 ## Users and jobs
 
-Admin meninjau permintaan, mengelola proses pembelian, pengguna, riset, dan ekspor. Pengaju mengajukan kebutuhan dan memantau request miliknya.
+Admin meninjau permintaan, mengelola proses pembelian, pengguna, riset, dan ekspor. Setiap Pengaju mewakili tepat satu riset, mengajukan kebutuhan dan memantau request miliknya; riset pengajuan mengikuti profil secara otomatis.
 
 ## Workflows
 
@@ -32,7 +32,13 @@ Invoice dikelola Admin sejak persetujuan, dapat dilihat Pengaju pemilik request 
 
 Tab Pembelian Barang dan RAB menggunakan URL. RAB CSV/XLSX/PDF maksimal 10 MB dan 1.000 barang; worksheet/pemetaan, review dan koreksi mendahului konfirmasi. PDF dipratinjau dan diisi manual tanpa OCR. Versi RAB bersifat tetap untuk request lama, satu versi aktif per riset. Pengaju membaca daftar barang dan membuat request dari barang yang dipilih. Nilai RAB tidak mengubah alokasi.
 
-Analitik Admin menggunakan tren nilai dengan rentang tanggal WIB dan peta urgensi berdasarkan sisa hari serta nilai request aktif. Grafik Pengaju menampilkan kebutuhan mingguan miliknya dengan pilihan agenda. Periode tren terpisah dari filter tabel dan ekspor; seluruh grafik mempunyai alternatif tabel, tooltip, dan keadaan kosong.
+Analitik Admin menggunakan tren nilai dengan rentang tanggal WIB dan peta urgensi berdasarkan sisa hari serta nilai request aktif. Label hari ini ditempatkan di luar area plot, terpisah dari nominal sumbu. Kelompok urgensi menampilkan jumlah barang.
+
+Dashboard Pengaju menampilkan dua grafik berdampingan: usia request aktif dari yang paling lama dan tren jumlah pengajuan serta penerimaan per minggu. Penerimaan dihitung sekali berdasarkan transisi Diterima yang tercatat; tanggal yang hilang tidak direka. Filter tahap, rentang 4/8/12 minggu terakhir, serta minggu terpilih tersimpan pada URL. Semua perhitungan dibatasi pada pemilik akun. Klik batang membuka detail; klik titik grafik garis atau tombol periode membuka daftar barang terkait. Titik mendukung Enter/Space. Tabel alternatif, tooltip dan keadaan kosong tetap tersedia.
+
+Form pengajuan menyediakan sumber Manual atau Dari RAB. Mode RAB mewajibkan dropdown dokumen aktif dan barang dari riset perwakilan, lalu mengisi nama, satuan, jumlah dan perkiraan harga. Nama serta satuan mengikuti sumber; jumlah dan perkiraan harga dapat disesuaikan. Lapisan mutasi memeriksa riset akun dan identitas barang RAB. Admin mengelola satu riset per Pengaju melalui dropdown pada profil pengguna.
+
+Katalog demo memuat enam RAB dan barang contoh dengan sumber CSV yang dapat dibuka atau diunduh; label Contoh unggahan Admin membedakannya dari impor nyata dalam demo. Sumber bawaan dihasilkan dari katalog, sedangkan file impor tetap menggunakan IndexedDB. Pembaruan revisi demo hanya mengganti fixture lama yang belum diubah, mempertahankan dokumen impor serta perubahan pengguna, dan menyederhanakan perwakilan lama ke riset pertama. Perubahan penugasan tidak mengubah riset pada request historis yang sudah diedit pengguna.
 
 ## Routed workflows
 
