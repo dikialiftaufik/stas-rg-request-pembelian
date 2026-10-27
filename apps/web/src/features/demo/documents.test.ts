@@ -6,12 +6,18 @@ import {
   reloadDemoState,
   saveInvoice,
   loadInvoiceFile,
+  importRab,
+  scopedRabs,
+  visibleRab,
+  saveRequest,
   visibleRequest,
   changeRequestStatus,
   deleteRequest,
   DEMO_STORAGE_KEY,
   resetDemoState,
+  saveUser,
 } from './store';
+import { requestDateLimits } from './model';
 import type { AttachmentRef } from './model';
 const blobs = vi.hoisted(() => {
   vi.resetModules();
@@ -50,12 +56,18 @@ vi.mock('./file-validation', () => ({
 import { getAttachment, putAttachment } from './attachment-db';
 const admin = () => loginDemo('admin@gmail.com', 'admin123');
 const file = () => new File(['data'], 'invoice.png', { type: 'image/png' });
+const rab = () => ({
+  researchId: 'smart',
+  name: 'RAB Sensor',
+  file: new File(['Barang,Jumlah,Harga\nSensor,2,100'], 'rab.csv'),
+  items: [{ name: 'Sensor', quantity: 2, unit: 'set', unitPrice: '100', notes: '' }],
+});
 beforeEach(() => {
   resetDemoState();
   blobs.clear();
   vi.clearAllMocks();
 });
-describe('invoice documents and permissions', () => {
+describe('dokumen dan cakupan peran', () => {
   it('memeriksa ulang request setelah menunggu pembacaan file', async () => {
     admin();
     await changeRequestStatus({
@@ -94,6 +106,20 @@ describe('invoice documents and permissions', () => {
     release?.(file());
     await expect(pending).rejects.toThrow(/tidak ditemukan|tidak dapat diakses/);
     expect(JSON.stringify(getSnapshot())).toBe(afterDelete);
+  });
+  it('membatasi RAB dan file pada riset yang diwakili', async () => {
+    admin();
+    const profile = getSnapshot().users.find((user) => user.id === 'demo-pengaju');
+    if (!profile) throw new Error('Profil tidak tersedia');
+    saveUser({ ...profile, researchIds: ['smart'] }, profile.id);
+    const allowed = await importRab(rab());
+    const other = await importRab({ ...rab(), researchId: 'weather' });
+    logoutDemo();
+    loginDemo('pengaju@gmail.com', 'pengaju123');
+    const current = getSnapshot().users.find((user) => user.id === profile.id);
+    if (!current) throw new Error('Profil tidak tersedia');
+    expect(scopedRabs(getSnapshot(), current).map((doc) => doc.id)).toEqual([allowed]);
+    expect(() => visibleRab(other)).toThrow(/tidak dapat diakses/);
   });
   it('menjaga invoice saat penggantian gagal, memulihkan setelah refresh dan memeriksa file sebelum selesai', async () => {
     admin();
@@ -200,6 +226,49 @@ describe('invoice documents and permissions', () => {
         expectedUpdatedAt: null,
       }),
     ).rejects.toThrow(/akses/);
+    await expect(importRab(rab())).rejects.toThrow(/akses/);
+  });
+  it('versi baru mempertahankan sumber request, alokasi tidak berubah dan Pengaju hanya membaca risetnya', async () => {
+    admin();
+    const allocation = getSnapshot().research.find((item) => item.id === 'smart')?.allocated;
+    const first = await importRab(rab());
+    const doc = visibleRab(first);
+    const item = doc.items[0];
+    if (!item) throw new Error('Barang kosong');
+    logoutDemo();
+    loginDemo('pengaju@gmail.com', 'pengaju123');
+    saveRequest(
+      {
+        item: item.name,
+        researchId: doc.researchId,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+        requiredDate: requestDateLimits().minimum,
+        url: '',
+        notes: '',
+      },
+      undefined,
+      { documentId: first, itemId: item.id },
+    );
+    const request = getSnapshot().requests[0];
+    expect(request?.rabDocumentId).toBe(first);
+    logoutDemo();
+    admin();
+    const second = await importRab({ ...rab(), items: [{ ...item, name: 'Versi kedua' }] });
+    expect(visibleRab(first).active).toBe(false);
+    expect(visibleRab(second).version).toBe(2);
+    expect(getSnapshot().research.find((item) => item.id === 'smart')?.allocated).toBe(allocation);
+    logoutDemo();
+    loginDemo('pengaju@gmail.com', 'pengaju123');
+    expect(
+      scopedRabs(
+        getSnapshot(),
+        getSnapshot().users.find((item) => item.id === 'demo-pengaju')!,
+      ),
+    ).toHaveLength(1);
+    expect(visibleRab(first).items[0]?.name).toBe('Sensor');
+    expect(getSnapshot().requests[0]?.item).toBe('Sensor');
   });
   it('snapshot lama mendapat default invoice, satuan dan RAB tanpa kehilangan data', () => {
     const data = getSnapshot();

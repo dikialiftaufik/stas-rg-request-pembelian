@@ -10,6 +10,7 @@ import {
   statusLabelMap,
   invoiceSchema,
   invoiceInputSchema,
+  rabItemInputSchema,
 } from './model';
 import type {
   DemoSnapshot,
@@ -19,6 +20,8 @@ import type {
   ResearchInput,
   RequestStatus,
   AttachmentRef,
+  RabDocument,
+  RabItemInput,
 } from './model';
 import { createSeed, demoAccounts } from './seed';
 import { allowedNextStatuses } from './request-workflow';
@@ -121,7 +124,11 @@ function notification(data: DemoSnapshot, recipientId: string, requestId: string
   };
 }
 
-export function saveRequest(input: RequestInput, id?: string) {
+export function saveRequest(
+  input: RequestInput,
+  id?: string,
+  source?: { documentId: string; itemId: string },
+) {
   const user = requireUser(Boolean(id));
   if (!id && user.role !== 'pengaju') throw new Error('Pembuatan request tersedia untuk Pengaju.');
   const values = requestInputSchema.parse(input);
@@ -135,8 +142,22 @@ export function saveRequest(input: RequestInput, id?: string) {
     !validateRequestDate(values.requiredDate)
   )
     throw new Error('Tanggal kebutuhan harus H-3 hari kerja sampai maksimal 180 hari ke depan.');
+  if (source) {
+    const doc = visibleRab(source.documentId);
+    if (
+      !doc.active ||
+      doc.researchId !== values.researchId ||
+      !doc.items.some((item) => item.id === source.itemId)
+    )
+      throw new Error('Barang RAB tidak tersedia untuk riset ini. Pilih barang dari RAB aktif.');
+  }
   const request = existing
-    ? { ...existing, ...values }
+    ? {
+        ...existing,
+        ...values,
+        rabDocumentId: existing.researchId === values.researchId ? existing.rabDocumentId : null,
+        rabItemId: existing.researchId === values.researchId ? existing.rabItemId : null,
+      }
     : {
         ...values,
         id: crypto.randomUUID(),
@@ -147,8 +168,8 @@ export function saveRequest(input: RequestInput, id?: string) {
         statusHistory: [],
         invoice: null,
         fulfillment: null,
-        rabDocumentId: null,
-        rabItemId: null,
+        rabDocumentId: source?.documentId ?? null,
+        rabItemId: source?.itemId ?? null,
       };
   let next = {
     ...data,
@@ -286,6 +307,8 @@ export function saveResearch(input: ResearchInput, id?: string) {
 export function deleteResearch(id: string) {
   requireUser(true);
   const data = getSnapshot();
+  if (data.rabDocuments.some((doc) => doc.researchId === id))
+    throw new Error('Riset masih memiliki dokumen RAB dan tidak dapat dihapus.');
   if (data.requests.some((item) => item.researchId === id))
     throw new Error('Jenis riset masih dirujuk oleh request dan tidak dapat dihapus.');
   if (data.users.some((item) => item.researchIds.includes(id)))
@@ -462,6 +485,93 @@ export async function saveInvoice(input: {
       });
   } catch (cause) {
     if (stored) await removeAttachment(stored).catch(() => undefined);
+    throw cause;
+  }
+}
+
+export function scopedRabs(data: DemoSnapshot, user: DemoUser) {
+  return data.rabDocuments.filter(
+    (doc) => user.role === 'admin' || (doc.active && user.researchIds.includes(doc.researchId)),
+  );
+}
+
+export function visibleRab(id: string) {
+  const user = requireUser();
+  const data = getSnapshot();
+  const doc = data.rabDocuments.find((item) => item.id === id);
+  const referencedByOwnRequest = data.requests.some(
+    (request) => !request.deleted && request.ownerId === user.id && request.rabDocumentId === id,
+  );
+  if (
+    !doc ||
+    (user.role !== 'admin' &&
+      !(doc.active && user.researchIds.includes(doc.researchId)) &&
+      !referencedByOwnRequest)
+  )
+    throw new Error('RAB tidak ditemukan atau tidak dapat diakses.');
+  return doc;
+}
+
+export async function loadRabFile(documentId: string) {
+  const blob = await getAttachment(visibleRab(documentId).source);
+  visibleRab(documentId);
+  return blob;
+}
+
+export async function importRab(input: {
+  researchId: string;
+  name: string;
+  file: File;
+  items: RabItemInput[];
+}) {
+  const actor = requireUser(true);
+  if (!input.name.trim()) throw new Error('Nama RAB wajib diisi.');
+  if (!input.items.length || input.items.length > 1000)
+    throw new Error('RAB harus berisi 1 sampai 1.000 barang.');
+  const items = input.items.map((item) => ({
+    ...rabItemInputSchema.parse(item),
+    id: crypto.randomUUID(),
+  }));
+  const mime = await validateFile(input.file, 'rab');
+  const stored = await putAttachment(input.file, mime, actor.id);
+  try {
+    const user = requireUser(true);
+    const data = getSnapshot();
+    if (user.id !== actor.id || !data.research.some((item) => item.id === input.researchId))
+      throw new Error('Riset atau sesi berubah. Pilih ulang riset tujuan.');
+    const version =
+      Math.max(
+        0,
+        ...data.rabDocuments
+          .filter((doc) => doc.researchId === input.researchId)
+          .map((doc) => doc.version),
+      ) + 1;
+    const doc: RabDocument = {
+      id: crypto.randomUUID(),
+      researchId: input.researchId,
+      name: input.name.trim(),
+      version,
+      active: true,
+      source: stored,
+      createdAt: new Date().toISOString(),
+      createdBy: user.id,
+      items,
+    };
+    publish(
+      {
+        ...data,
+        rabDocuments: [
+          ...data.rabDocuments.map((item) =>
+            item.researchId === input.researchId ? { ...item, active: false } : item,
+          ),
+          doc,
+        ],
+      },
+      true,
+    );
+    return doc.id;
+  } catch (cause) {
+    await removeAttachment(stored).catch(() => undefined);
     throw cause;
   }
 }
