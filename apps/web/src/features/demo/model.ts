@@ -33,7 +33,7 @@ export const userInputSchema = z
     researchIds: z.array(z.string()),
   })
   .refine((value) => value.role === 'admin' || value.researchIds.length > 0, {
-    message: 'Pilih minimal satu jenis riset untuk Pengaju.',
+    message: 'Pilih minimal satu riset yang diwakili Pengaju.',
     path: ['researchIds'],
   });
 export const userSchema = z.object({
@@ -51,8 +51,89 @@ export const researchInputSchema = z.object({
   allocated: positiveMoneySchema,
 });
 export const researchSchema = researchInputSchema.extend({ id: z.string() });
+export const attachmentSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  name: z.string().min(1),
+  mime: z.string(),
+  size: z
+    .number()
+    .positive()
+    .max(10 * 1024 * 1024),
+  uploadedAt: z.iso.datetime(),
+  uploadedBy: z.string(),
+});
+export const webUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => {
+    if (!value) return true;
+    try {
+      return ['http:', 'https:'].includes(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }, 'Gunakan tautan HTTP atau HTTPS yang lengkap.');
+export const invoiceSchema = z
+  .object({
+    amount: positiveMoneySchema.nullable().default(null),
+    invoiceDate: z.iso.date().nullable().default(null),
+    file: attachmentSchema.nullable(),
+    url: webUrlSchema,
+    updatedAt: z.iso.datetime(),
+    updatedBy: z.string(),
+  })
+  .refine((value) => Boolean(value.file || value.url), 'Unggah file atau isi tautan invoice.');
+export const invoiceInputSchema = z.object({
+  amount: positiveMoneySchema,
+  invoiceDate: z.iso
+    .date('Tanggal invoice tidak valid.')
+    .refine(
+      (value) => value <= formatInTimeZone(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd'),
+      'Tanggal invoice tidak boleh melewati hari ini.',
+    ),
+});
+export const fulfillmentInputSchema = z.object({
+  supplier: z.string().trim().max(200, 'Nama pemasok maksimal 200 karakter.'),
+  courier: z.string().trim().max(120, 'Nama kurir maksimal 120 karakter.'),
+  trackingNumber: z.string().trim().max(120, 'Nomor resi maksimal 120 karakter.'),
+  estimatedArrival: z.iso.date('Tanggal estimasi tidak valid.').nullable(),
+  notes: z.string().trim().max(2000, 'Catatan maksimal 2.000 karakter.'),
+});
+export const fulfillmentSchema = fulfillmentInputSchema.extend({
+  updatedAt: z.iso.datetime(),
+  updatedBy: z.string(),
+});
+export type FulfillmentInfo = z.infer<typeof fulfillmentSchema>;
+export type FulfillmentInput = z.infer<typeof fulfillmentInputSchema>;
+export const rabItemInputSchema = z.object({
+  name: z.string().trim().min(1, 'Nama barang wajib diisi.'),
+  quantity: z.number().int('Jumlah harus bilangan bulat.').positive('Jumlah minimal satu.'),
+  unit: z.string().trim().min(1, 'Satuan wajib diisi.'),
+  unitPrice: positiveMoneySchema,
+  notes: z.string().trim(),
+});
+export const rabItemSchema = rabItemInputSchema.extend({ id: z.string() });
+export const rabDocumentSchema = z.object({
+  id: z.string(),
+  researchId: z.string(),
+  name: z.string().trim().min(1),
+  version: z.number().int().positive(),
+  active: z.boolean(),
+  source: attachmentSchema,
+  createdAt: z.iso.datetime(),
+  createdBy: z.string(),
+  items: z.array(rabItemSchema).min(1).max(1000),
+});
+export type AttachmentRef = z.infer<typeof attachmentSchema>;
+export type Invoice = z.infer<typeof invoiceSchema>;
+export type RabDocument = z.infer<typeof rabDocumentSchema>;
+export type RabItem = z.infer<typeof rabItemSchema>;
+export type RabItemInput = z.infer<typeof rabItemInputSchema>;
+
 export const requestInputSchema = z.object({
   item: z.string().trim().min(1, 'Nama barang wajib diisi.'),
+  unit: z.string().trim().min(1, 'Satuan wajib diisi.'),
   researchId: z.string().min(1, 'Pilih jenis riset.'),
   quantity: z.number().int('Jumlah harus bilangan bulat.').min(1, 'Jumlah minimal satu.'),
   unitPrice: positiveMoneySchema,
@@ -67,12 +148,25 @@ export const requestInputSchema = z.object({
   }, 'Gunakan URL HTTP atau HTTPS.'),
   notes: z.string().trim(),
 });
+export const statusChangeSchema = z.object({
+  from: statusSchema,
+  to: statusSchema,
+  actorId: z.string(),
+  at: z.iso.datetime(),
+  reason: z.string(),
+});
 export const requestSchema = requestInputSchema.extend({
   id: z.string(),
   ownerId: z.string(),
+  unit: z.string().trim().min(1).default('unit'),
+  invoice: invoiceSchema.nullable().default(null),
+  fulfillment: fulfillmentSchema.nullable().default(null),
+  rabDocumentId: z.string().nullable().default(null),
+  rabItemId: z.string().nullable().default(null),
   status: statusSchema,
   createdAt: z.iso.datetime(),
   deleted: z.boolean(),
+  statusHistory: z.array(statusChangeSchema).default([]),
 });
 const notificationSchema = z.object({
   id: z.string(),
@@ -86,10 +180,12 @@ export const snapshotSchema = z
   .object({
     version: z.literal(1),
     accountId: z.enum(['demo-admin', 'demo-pengaju']).nullable(),
+    adminNoticeSeen: z.boolean().default(false),
     users: z.array(userSchema),
     research: z.array(researchSchema),
     requests: z.array(requestSchema),
     notifications: z.array(notificationSchema),
+    rabDocuments: z.array(rabDocumentSchema).default([]),
   })
   .superRefine((value, context) => {
     const users = new Set(value.users.map((user) => user.id));
@@ -101,6 +197,19 @@ export const snapshotSchema = z
         (request) => !users.has(request.ownerId) || !research.has(request.researchId),
       ) ||
       value.users.some((user) => user.researchIds.some((id) => !research.has(id))) ||
+      value.rabDocuments.some(
+        (doc) => !research.has(doc.researchId) || !users.has(doc.createdBy),
+      ) ||
+      value.requests.some(
+        (request) =>
+          request.rabDocumentId !== null &&
+          !value.rabDocuments.some(
+            (doc) =>
+              doc.id === request.rabDocumentId &&
+              doc.researchId === request.researchId &&
+              doc.items.some((item) => item.id === request.rabItemId),
+          ),
+      ) ||
       users.size !== value.users.length ||
       research.size !== value.research.length
     ) {
@@ -110,6 +219,7 @@ export const snapshotSchema = z
 
 export type DemoRole = z.infer<typeof roleSchema>;
 export type RequestStatus = z.infer<typeof statusSchema>;
+export type RequestStatusChange = z.infer<typeof statusChangeSchema>;
 export type DemoUser = z.infer<typeof userSchema>;
 export type DemoResearch = z.infer<typeof researchSchema>;
 export type DemoRequest = z.infer<typeof requestSchema>;
@@ -137,7 +247,7 @@ export const formatDate = (value: string) =>
   new Intl.DateTimeFormat('id-ID', {
     timeZone: 'Asia/Jakarta',
     day: 'numeric',
-    month: 'numeric',
+    month: 'short',
     year: 'numeric',
   }).format(new Date(value.includes('T') ? value : `${value}T12:00:00+07:00`));
 

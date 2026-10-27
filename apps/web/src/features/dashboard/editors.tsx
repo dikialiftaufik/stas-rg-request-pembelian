@@ -65,6 +65,7 @@ export function RequestEditor({
     resolver: zodResolver(schema),
     defaultValues: request ?? {
       item: '',
+      unit: 'unit',
       researchId: user?.researchIds[0] ?? '',
       quantity: 1,
       unitPrice: '',

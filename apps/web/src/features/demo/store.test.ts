@@ -37,6 +37,7 @@ function pengaju() {
 function requestInput(): RequestInput {
   return {
     item: 'Barang pengujian',
+    unit: 'unit',
     researchId: 'smart',
     quantity: 3,
     unitPrice: '0.10',
@@ -211,7 +212,7 @@ describe('pengguna, riset, dan notifikasi', () => {
     if (!user) throw new Error('Pengguna tidak tersedia');
     saveUser({ ...user, name: 'Nama Diperbarui' }, user.id);
     expect(() => saveUser({ ...user })).toThrow(/sudah digunakan/);
-    expect(() => deleteResearch(research.id)).toThrow(/ditugaskan/);
+    expect(() => deleteResearch(research.id)).toThrow(/perwakilan/);
     expect(loginDemo('uji@example.test', 'pengaju123')).toBe(false);
     deleteUser(user.id);
     deleteResearch(research.id);

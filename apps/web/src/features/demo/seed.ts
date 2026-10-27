@@ -111,6 +111,11 @@ export function createSeed(): DemoSnapshot {
     ownerId: owners[index % owners.length] ?? 'demo-pengaju',
     researchId: research[index % research.length]?.id ?? 'smart',
     quantity: 1,
+    unit: 'unit',
+    invoice: null,
+    fulfillment: null,
+    rabDocumentId: null,
+    rabItemId: null,
     unitPrice: prices.at(index) ?? (index === 23 ? '10500000' : '4500000'),
     status: [0, 4, 5, 6].includes(index)
       ? 'pending_review'
@@ -121,6 +126,7 @@ export function createSeed(): DemoSnapshot {
     url: '',
     notes: 'Data contoh untuk demonstrasi frontend.',
     deleted: false,
+    statusHistory: [],
     createdAt: new Date(Date.UTC(2026, 9, 26 - index, 8)).toISOString(),
   }));
   const notifications: DemoSnapshot['notifications'] = [
@@ -165,5 +171,14 @@ export function createSeed(): DemoSnapshot {
       createdAt,
     },
   ];
-  return { version: 1, accountId: null, users, research, requests, notifications };
+  return {
+    version: 1,
+    accountId: null,
+    adminNoticeSeen: false,
+    users,
+    research,
+    requests,
+    notifications,
+    rabDocuments: [],
+  };
 }

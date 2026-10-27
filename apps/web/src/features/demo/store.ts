@@ -120,6 +120,11 @@ export function saveRequest(input: RequestInput, id?: string) {
         status: 'pending_review' as const,
         createdAt: new Date().toISOString(),
         deleted: false,
+        statusHistory: [],
+        invoice: null,
+        fulfillment: null,
+        rabDocumentId: null,
+        rabItemId: null,
       };
   let next = {
     ...data,
@@ -136,6 +141,7 @@ export function saveRequest(input: RequestInput, id?: string) {
     `${request.item} ${existing ? 'diperbarui oleh Admin.' : 'menunggu persetujuan.'}`,
   );
   publish(next);
+  return request.id;
 }
 export function deleteRequest(id: string) {
   requireUser(true);
@@ -205,6 +211,7 @@ export function saveUser(input: UserInput, id?: string) {
       ? data.users.map((item) => (item.id === id ? user : item))
       : [...data.users, user],
   });
+  return user.id;
 }
 export function deleteUser(id: string) {
   requireUser(true);
@@ -236,6 +243,7 @@ export function saveResearch(input: ResearchInput, id?: string) {
       ? data.research.map((item) => (item.id === id ? research : item))
       : [...data.research, research],
   });
+  return research.id;
 }
 export function deleteResearch(id: string) {
   requireUser(true);
@@ -243,7 +251,7 @@ export function deleteResearch(id: string) {
   if (data.requests.some((item) => item.researchId === id))
     throw new Error('Jenis riset masih dirujuk oleh request dan tidak dapat dihapus.');
   if (data.users.some((item) => item.researchIds.includes(id)))
-    throw new Error('Jenis riset masih ditugaskan kepada pengguna.');
+    throw new Error('Jenis riset masih memiliki perwakilan pengguna.');
   publish({ ...data, research: data.research.filter((item) => item.id !== id) });
 }
 export function markNotificationsRead(ids?: string[]) {
