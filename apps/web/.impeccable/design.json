@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-27T00:00:00+07:00",
+  "title": "Design System: STAS-RG Warm Green",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 16px 48px rgb(24 57 47 / 18%)",
+        "purpose": "Menu dan dialog pada lapisan di atas konten."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-transition",
+        "value": "150ms",
+        "purpose": "Hover dan perubahan warna kontrol; dinonaktifkan ketika reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "640px"
+      },
+      {
+        "name": "tablet",
+        "value": "768px"
+      },
+      {
+        "name": "sidebar",
+        "value": "1024px"
+      },
+      {
+        "name": "wide",
+        "value": "1280px"
+      },
+      {
+        "name": "analytics-stack",
+        "value": "1100px"
+      }
+    ],
+    "recordLayout": {
+      "maxWidth": "1280px",
+      "desktopColumns": "2fr 1fr",
+      "collapseBelow": "1024px",
+      "purpose": "Form dan detail bertautan langsung, dengan konteks dan ringkasan."
+    },
+    "chartRoles": [
+      {
+        "name": "urgent",
+        "value": "#a65b17",
+        "purpose": "Kebutuhan 0–3 hari / menunggu persetujuan."
+      },
+      {
+        "name": "soon",
+        "value": "#718a59",
+        "purpose": "Kebutuhan 4–7 hari / disetujui."
+      },
+      {
+        "name": "ordered",
+        "value": "#426b83",
+        "purpose": "Pemesanan aktif."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Aksi utama yang menyimpan atau melanjutkan pekerjaan.",
+      "html": "<button class=\"ds-button ds-primary\">Buat request</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:8px 14px;border:1px solid transparent;border-radius:8px;font:600 13px/1.5 var(--font-sans, sans-serif);cursor:pointer}.ds-button:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-primary{background:var(--ui-primary);color:white}.ds-primary:hover{background:var(--ui-primary-hover)}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "description": "Aksi pendukung dan pembatalan.",
+      "html": "<button class=\"ds-button ds-secondary\">Kembali</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:8px 14px;border:1px solid transparent;border-radius:8px;font:600 13px/1.5 var(--font-sans, sans-serif);cursor:pointer}.ds-button:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-secondary{background:var(--ui-surface);color:var(--ui-ink);border-color:var(--ui-border)}.ds-secondary:hover{background:var(--ui-hover)}"
+    },
+    {
+      "name": "Excel export",
+      "kind": "button",
+      "refersTo": "button-export",
+      "description": "Ekspor Excel memakai varian primary yang sama dengan Impor RAB.",
+      "html": "<button class=\"ds-button ds-export\">Ekspor Excel</button>",
+      "css": ".ds-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;padding:8px 14px;border:1px solid transparent;border-radius:8px;font:600 13px/1.5 var(--font-sans, sans-serif);cursor:pointer}.ds-button:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:not-allowed}.ds-export{background:var(--ui-export);color:white}.ds-export:hover{background:var(--ui-primary-hover)}"
+    },
+    {
+      "name": "Text input",
+      "kind": "input",
+      "description": "Input operasional ringkas dengan fokus yang terlihat.",
+      "html": "<label class=\"ds-field\" for=\"ds-name\">Nama barang<input id=\"ds-name\" class=\"ds-input\" placeholder=\"Masukkan nama barang\"></label>",
+      "css": ".ds-field{display:grid;gap:6px;color:var(--ui-ink);font:500 13px var(--font-sans,sans-serif)}.ds-input{min-height:38px;padding:8px 10px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-surface);color:var(--ui-ink);font:inherit}.ds-input::placeholder{color:var(--ui-muted)}.ds-input:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px}"
+    },
+    {
+      "name": "Active navigation",
+      "kind": "nav",
+      "description": "Lokasi aktif pada sidebar terang.",
+      "html": "<nav><a class=\"ds-nav\" href=\"#dashboard\" aria-current=\"page\">Dashboard</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;min-height:42px;padding:10px 12px;border-radius:8px;background:var(--ui-sage);color:var(--ui-primary);text-decoration:none;font:600 14px var(--font-sans,sans-serif)}.ds-nav:hover{background:var(--ui-hover)}.ds-nav:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px}"
+    },
+    {
+      "name": "Status badge",
+      "kind": "chip",
+      "description": "Status berlabel tanpa titik; warna mendukung teks.",
+      "html": "<span class=\"ds-status\">Disetujui</span>",
+      "css": ".ds-status{display:inline-flex;padding:3px 7px;border-radius:5px;background:#e3f1e5;color:#22603b;font:600 12px/1.5 var(--font-sans,sans-serif)}"
+    },
+    {
+      "name": "Content panel",
+      "kind": "card",
+      "description": "Permukaan data putih di atas canvas hangat.",
+      "html": "<section class=\"ds-panel\"><h2>Request terbaru</h2><p>Lima pengajuan terakhir dalam lingkup Anda.</p></section>",
+      "css": ".ds-panel{padding:20px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface);color:var(--ui-ink);font:14px/1.5 var(--font-sans,sans-serif)}.ds-panel h2{margin:0;font-size:18px;font-weight:650}.ds-panel p{margin:4px 0 0;color:var(--ui-muted);font-size:13px}"
+    },
+    {
+      "name": "Record page",
+      "kind": "layout",
+      "description": "Breadcrumb, judul, kartu utama dan ringkasan; halaman penuh menggantikan form modal.",
+      "html": "<section class=\"ds-record\"><article>Informasi barang</article><aside>Ringkasan pembelian</aside></section>",
+      "css": ".ds-record{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:24px;max-width:1280px;margin:auto}@media(max-width:1023px){.ds-record{grid-template-columns:minmax(0,1fr)}}"
+    }
+  ],
+  "narrative": {
+    "overview": "Mode Operate: desain membantu pekerjaan Pembelian Barang. Identitas hijau hangat berasal dari logo dan konteks riset STAS-RG. Tampilkan informasi dan aksi sebelum dekorasi.",
+    "keyCharacteristics": [
+      "Hijau hangat, ringkas, dan tenang.",
+      "Hierarki informasi dan aksi yang jelas.",
+      "Tabel rapat, dokumen terbaca, fokus keyboard terjaga."
+    ]
+  }
+}

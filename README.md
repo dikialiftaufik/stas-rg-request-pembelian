@@ -1,4 +1,4 @@
-# STAS-RG Request Pembelian
+# STAS-RG Pembelian Barang
 
 Workspace monorepo untuk frontend STAS-RG pada Windows, tanpa Docker.
 
@@ -23,7 +23,7 @@ Node yang digunakan **24.22.1**, pnpm **12.15.0**. Node sudah tersedia; pnpm dip
 apps/web/             React + Vite + Refine SPA
 packages/             Tempat paket bersama di tahap berikutnya
 docs/                 Dokumentasi lokal, dikecualikan dari Git
-visual-references/    Referensi yang sudah ada sebelum setup, tidak diubah
+assets/img/           Logo asli STAS-RG
 ```
 
 Backend belum dibuat. Nantinya backend dapat ditempatkan di apps/api, sesuai keputusan monorepo tim.
@@ -55,9 +55,9 @@ pnpm.cmd --filter @stas/web exec playwright install chromium
 - React 19.3, Vite 8.3, TypeScript 6.0.3 strict, Tailwind 4.3.
 - Refine 5, React Router 7, TanStack Query/Table, React Hook Form, Zod.
 - Heroicons, Sonner, Recharts, Day Picker, font lokal, Decimal dan date utilities.
-- Radix Slot dan fondasi Button copy-in dengan konfigurasi CLI shadcn yang dipin.
+- Komponen resmi shadcn berbasis Radix: Select, DropdownMenu, Popover, Calendar, Dialog/Sheet, Tabs, Badge, serta komposisi Chart/Recharts. Ikon tetap Heroicons.
 - ESLint, Prettier, Vitest/Testing Library, MSW, Playwright/axe dan Turborepo.
-- Halaman login responsif sesuai visual-references/login.png, dengan validasi form dan tombol tampilkan password.
+- Halaman login responsif dengan identitas asli STAS-RG, dengan validasi form dan tombol tampilkan password.
 
 Versi dependency dan integrity tercatat di pnpm-lock.yaml; patch dan override berada di patches/ dan pnpm-workspace.yaml. Catatan baseline tambahan tersedia secara lokal di docs/dependency-baseline.json, yang dikecualikan dari Git. Paket pendamping yang tidak dipin spesifikasi dipilih setelah pemeriksaan metadata dan kecocokan Node/peer.
 
@@ -86,9 +86,13 @@ Pada layar mulai 1024 px, halaman menampilkan form dan panel identitas STAS-RG. 
 
 Admin dapat mencari/filter/sort request, melihat detail, mengedit atau menghapus, mengekspor XLSX, serta mengelola pengguna dan riset. Pengaju hanya melihat miliknya, membuat request, dan membatalkan pengajuan yang masih menunggu persetujuan. Rute /users dan /research-types hanya tersedia untuk Admin. Sidebar, drawer mobile, notifikasi, profil, dan logout dapat digunakan.
 
-Setiap Admin membuka /dashboard (termasuk kembali dari halaman lain atau refresh), hard popup sesuai visual-references/hard-popup.png muncul sebelum interaksi dashboard. Popup menggunakan request pending yang terkait dengan pemberitahuan Admin; jika belum ada pemberitahuan, gunakan request pending yang tersedia. Request terhapus atau yang tidak lagi pending diabaikan. Persetujuan yang belum selesai tetap diingatkan walaupun notifikasi lonceng sudah dibaca. Counter menunjukkan pemberitahuan pertama dari jumlah yang relevan.
+Popup Admin tampil sekali setiap sesi login berhasil, hanya bila ada request menunggu persetujuan. Penanda `adminNoticeSeen` bertahan pada navigasi dan refresh; logout/login ulang memulai sesi baru. Popup merangkum seluruh pending dan maksimal tiga request terbaru. X, Nanti saja, Escape, atau Tinjau request menutupnya secara manual. Tinjau request membuka daftar pending, sedangkan penutupan tidak otomatis menandai notifikasi dibaca.
 
-Admin harus menutup popup melalui tombol X atau Nanti saja, atau memilih Tinjau Request untuk membuka detail request tersebut dan menandai pemberitahuannya dibaca. Escape, klik backdrop, dan timer tidak menutup popup. Fokus keyboard dan interaksi tetap di dalam popup, serta scroll halaman belakang dikunci. Popup tidak muncul untuk Pengaju. Ketika tidak ada request pending, popup menampilkan ringkasan kosong dan tetap menyediakan tombol penutupan manual.
+Admin mengubah status secara bertahap: Menunggu Persetujuan → Disetujui → Sudah Dipesan → Dalam Pengiriman → Diterima → Selesai. Penolakan hanya dari Menunggu Persetujuan dan memerlukan alasan. Riwayat merekam status asal/tujuan, pelaku, waktu WIB, dan catatan; Pengaju mendapat notifikasi. Persetujuan yang melebihi alokasi dan perubahan stale ditolak tanpa menulis data. Pengaju tetap dapat membatalkan request sendiri yang pending.
+
+Redesign menggunakan token hijau hangat bersama, kontrol ringkas, sidebar 232 px, topbar 64 px, dan permukaan data putih dengan KPI sage. Sorting seluruh kolom data ada pada header, dengan state pencarian/filter/sort/pagination pada URL; kolom Aksi tetap terlihat saat tabel digeser. Ekspor XLSX hanya di halaman Pembelian Barang bagi Admin dan mencakup seluruh hasil filter serta urutan aktif. Toast memberi umpan balik aksi yang berhasil; error form tetap berada dekat field. Istilah penugasan menjadi Perwakilan riset.
+
+Panduan produk dan sistem visual tersedia di [PRODUCT.md](apps/web/PRODUCT.md), [DESIGN.md](apps/web/DESIGN.md), dan sidecar `.impeccable/design.json` pada aplikasi web. Snapshot versi 1 lama mendapat nilai bawaan penanda sesi dan riwayat kosong melalui Zod, tanpa membuang perubahan data yang valid.
 
 Dataset awal memuat 24 request (18 disetujui, 4 menunggu, total Rp125.400.000). Dashboard merangkum data sesuai cakupan peran dan menampilkan lima request terbaru; halaman /requests menyediakan pagination seluruh data yang diizinkan. Semua nominal dihitung dengan Decimal.js. Pemakaian dana riset berasal dari request disetujui dan status sesudahnya; ini simulasi komitmen, bukan ledger pembayaran.
 
@@ -96,9 +100,31 @@ Sesi dan perubahan data disimpan per tab di sessionStorage dengan key stas-rg-de
 
 Kedua akun login utama tidak dapat dihapus atau diubah email/perannya. CRUD pengguna tambahan tidak membuat kredensial login baru. Pengguna/riset yang masih dirujuk request tidak dapat dihapus. Tanggal kebutuhan baru minimal H-3 hari kerja (Senin–Jumat) dalam Asia/Jakarta dan maksimal 180 hari; daftar hari libur demo kosong.
 
-Ini **simulasi frontend**, bukan autentikasi atau pengamanan data produksi: kode dan data contoh dapat diperiksa di browser. Sebelum menggunakan data nyata, ganti adapter dengan autentikasi dan otorisasi server. Backend, invoice, impor RAB, dan ledger pendanaan belum termasuk cakupan ini.
+Ini **simulasi frontend**, bukan autentikasi atau pengamanan data produksi: kode dan data contoh dapat diperiksa di browser. Sebelum menggunakan data nyata, ganti adapter dengan autentikasi dan otorisasi server. Integrasi backend, penyimpanan dokumen server, pemindaian malware, OCR, dan ledger pembayaran produksi belum termasuk cakupan ini.
 
 Ekspor menggunakan exceljs 4.4.0 yang dimuat saat dibutuhkan. Override uuid 11.1.1 khusus ExcelJS menangani [GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq); jalur ExcelJS menggunakan API v4, yang tidak terdampak advisory tersebut. Pertahankan override dan lockfile bersama.
+
+## Invoice, RAB, analitik dan periode
+
+Admin melengkapi satu invoice aktif per request sejak status Disetujui: file PDF/PNG/JPEG/WebP maksimal 10 MB, tautan HTTP/HTTPS, atau keduanya. Pengaju hanya membaca invoice request miliknya. Penggantian meminta konfirmasi, mempertahankan file lama sampai transaksi baru berhasil, dan tidak mengumumkan keberhasilan saat penyimpanan gagal. Status Selesai memerlukan invoice yang valid serta file lokal yang masih tersedia; dokumen hilang harus diunggah ulang. Request lama yang sudah Selesai tidak diturunkan statusnya.
+
+Metadata tervalidasi Zod berada di sessionStorage; Blob disimpan di IndexedDB `stas-rg-attachments-v1`, dengan namespace dari `stas-rg-files-session-v1` per tab. Berkas bertahan setelah refresh dan pergantian akun di tab yang sama. Tab lain tidak mendapat metadata atau akses melalui namespace baru. Data ini bukan cadangan: penghapusan data browser menghapus dokumen. Setelah tab ditutup, Blob lama dapat tetap menempati penyimpanan browser tetapi tidak ditampilkan dalam sesi baru; bersihkan data situs untuk menghapusnya. Jangan memakai dokumen sensitif untuk demo.
+
+Halaman Pembelian Barang memiliki tab RAB dengan state URL. Admin mengimpor CSV, XLSX multi-worksheet, atau PDF maksimal 10 MB dan 1.000 barang. CSV memakai Papa Parse dalam worker dengan format angka Indonesia sebagai default; XLSX memakai ExcelJS dan mempertahankan nilai numerik. Formula tidak dieksekusi. Petakan kolom, perbaiki error per baris, lalu konfirmasikan. PDF memakai PDF.js untuk pratinjau dan input barang manual, tanpa klaim OCR/ekstraksi. Template CSV/XLSX tersedia. Semua total memakai Decimal.js.
+
+Setiap riset mempunyai satu RAB aktif; impor berikutnya menambah versi. Daftar barang dapat dicari, diurutkan, dibaca per halaman, dan dokumen sumber dapat dipratinjau. Pengaju membaca RAB aktif dari riset yang diwakilinya dan memilih Ajukan barang ini untuk mengisi form request. Referensi versi/barang serta satuan tersimpan pada request; revisi RAB tidak mengubah pengajuan lama. RAB tetap terpisah dari alokasi riset dan validasi komitmen.
+
+Dashboard Admin menampilkan tren nilai berperiode WIB dan peta urgensi request aktif. Default tren delapan minggu dapat diganti; agregasi harian, mingguan, atau bulanan mengikuti panjang periode. Dashboard Pengaju menampilkan agenda kebutuhan mingguannya sendiri. Chart memakai data demo aktual, tooltip/legenda dan alternatif tabel.
+
+Filter rentang tanggal pengajuan bersifat inklusif WIB, default Semua tanggal, dengan preset dan kalender. Parameter `from`/`to`, pencarian, status, riset dan sorting berlaku sama pada tabel serta seluruh hasil ekspor lintas pagination. Tombol Ekspor Excel hanya tersedia bagi Admin di Pembelian Barang. Workbook mencatat periode, filter, satuan, tanggal pengajuan dan informasi invoice; file lokal diekspor sebagai nama, tanpa tautan blob. Akun demo, data dan dokumen tidak tersinkronisasi ke server/perangkat lain.
+
+## Halaman dan perjalanan barang
+
+Semua form/detail menggunakan halaman. Rute barang: `/requests/new`, `/requests/:id`, serta subhalaman `/edit`, `/status`, `/invoice`, dan `/delivery`. RAB memakai `/requests/rab`, `/requests/rab/import`, dan `/requests/rab/:id`; profil dan notifikasi memakai `/profile` serta `/notifications`. URL lama tetap dialihkan. Form memperingatkan perubahan yang belum disimpan saat navigasi atau refresh.
+
+Invoice baru dan pembaruan membutuhkan nominal positif serta tanggal dokumen sampai hari ini (WIB). Total invoice dapat berbeda dari request tanpa mengubah komitmen; selisih ditampilkan dan nominal/tanggal masuk Excel. Snapshot lama mendapat metadata kosong; transisi baru menuju Selesai meminta kelengkapan, tanpa menurunkan status lama.
+
+Informasi pengiriman berupa pemasok, kurir, resi, estimasi tiba, dan catatan diperbarui manual oleh Admin. Mutasi memeriksa peran dan versi data; notifikasi dikirim ke Pengaju. Linimasa menggunakan status serta tanggal dari riwayat aktual, bukan estimasi tahap otomatis. Belum ada integrasi kurir, pembayaran, atau backend produksi.
 
 ## Komponen dan integrasi berikutnya
 
