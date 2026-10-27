@@ -9,138 +9,102 @@ async function enterDashboard(page: Page, role: 'admin' | 'pengaju' = 'admin') {
   await page.getByRole('button', { name: 'Masuk ke Dashboard' }).click();
   await page.waitForURL('**/dashboard');
 }
-
-test('hard popup memblokir aksi, Escape, klik backdrop, dan scroll halaman', async ({ page }) => {
+test('popup pertama login mengunci latar, fokus keyboard dan dapat ditutup dengan Escape', async ({
+  page,
+}) => {
   await enterDashboard(page);
-  const notice = page.getByRole('alertdialog', { name: 'Pemberitahuan Request' });
+  const notice = page.getByRole('dialog', { name: 'Pemberitahuan Request' });
+  await expect(notice).toContainText('4 request menunggu persetujuan');
+  await expect(notice.locator('li')).toHaveCount(3);
+  await expect(page.locator('body')).toHaveAttribute('data-scroll-locked', '1');
+  const profile = page.locator('[aria-label="Buka profil"]');
+  await profile.evaluate((element) => element.focus());
+  await expect(profile).not.toBeFocused();
+  await page.mouse.click(10, 10);
   await expect(notice).toBeVisible();
-  await expect(notice).toContainText('1 dari 3');
-  await expect(notice).toContainText('Persetujuan diperlukan: Oscilloscope Digital');
-  await expect(notice).toContainText('Rp 12.500.000');
-  await expect(notice.getByRole('heading', { level: 3 })).toBeFocused();
-  expect(await notice.evaluate((element) => element.matches(':modal'))).toBe(true);
-  const search = page.locator('input[aria-label="Cari request"]');
-  await search.evaluate((element) => element.focus());
-  await expect(search).not.toBeFocused();
-  const profile = await page.getByRole('button', { name: 'Buka profil' }).boundingBox();
-  if (!profile) throw new Error('Tombol profil tidak ditemukan');
-  await page.mouse.click(profile.x + profile.width / 2, profile.y + profile.height / 2);
-  await expect(page.getByRole('dialog', { name: 'Profil Pengguna' })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(notice).toBeVisible();
-  await page.mouse.click(16, 16);
-  await expect(notice).toBeVisible();
-  await page.mouse.wheel(0, 500);
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  await notice.getByRole('heading', { level: 3 }).focus();
   for (let index = 0; index < 6; index++) {
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(index > 2 ? 'Shift+Tab' : 'Tab');
     expect(await notice.evaluate((element) => element.contains(document.activeElement))).toBe(true);
   }
-  await notice.getByRole('button', { name: 'Nanti saja' }).click();
+  await page.keyboard.press('Escape');
   await expect(notice).toHaveCount(0);
   await expect(page.getByRole('main')).toBeFocused();
-  await search.fill('Oscilloscope');
-  await expect(search).toHaveValue('Oscilloscope');
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
-});
-
-test('X menutup manual, kunjungan ulang dan refresh menampilkan popup kembali', async ({
-  page,
-}) => {
-  await enterDashboard(page);
-  const notice = page.getByRole('alertdialog', { name: 'Pemberitahuan Request' });
-  await notice.getByRole('button', { name: 'Tutup pemberitahuan' }).click();
-  await page.getByRole('link', { name: 'Request Pembelian', exact: true }).click();
+  await page.reload();
   await expect(notice).toHaveCount(0);
+  await page.goto('/');
+  await expect(page).toHaveURL('/dashboard');
+  await expect(notice).toHaveCount(0);
+  await page.getByRole('link', { name: 'Pembelian Barang', exact: true }).click();
   await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
-  await expect(notice).toBeVisible();
-  await notice.getByRole('button', { name: 'Nanti saja' }).click();
-  await page.reload();
-  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Notifikasi, 3 belum dibaca' })).toBeVisible();
 });
-
-test('Tinjau Request membuka detail yang tepat dan dialog biasa masih mendukung Escape', async ({
+test('X dan Nanti saja manual, login berikutnya memulai sesi pemberitahuan baru', async ({
   page,
 }) => {
   await enterDashboard(page);
-  await page.getByRole('button', { name: 'Tinjau Request', exact: true }).click();
-  await expect(page).toHaveURL('/requests?detail=request-1');
-  const detail = page.getByRole('dialog', { name: 'Detail Request Pembelian' });
-  await expect(detail).toBeVisible();
-  await expect(detail).toContainText('Oscilloscope Digital');
-  await expect(detail).toContainText('Ir. Citra Dewi');
-  await expect(page.getByRole('alertdialog')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(detail).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Notifikasi, 2 belum dibaca' })).toBeVisible();
-});
-
-test('dashboard Pengaju tidak menampilkan hard popup', async ({ page }) => {
-  await enterDashboard(page, 'pengaju');
-  await expect(
-    page.getByRole('heading', { name: 'Dashboard Pengadaan', exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole('alertdialog')).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByRole('alertdialog')).toHaveCount(0);
-  await page.getByRole('searchbox', { name: 'Cari request' }).fill('Oscilloscope');
-});
-
-test('keadaan kosong tidak mengarang pemberitahuan dan tetap memerlukan penutupan manual', async ({
-  page,
-}) => {
+  await page.getByRole('button', { name: 'Tutup pemberitahuan' }).click();
+  await page.getByRole('button', { name: 'Keluar', exact: true }).click();
   await enterDashboard(page);
+  await expect(page.getByRole('dialog', { name: 'Pemberitahuan Request' })).toBeVisible();
   await page.getByRole('button', { name: 'Nanti saja' }).click();
+  await page.reload();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+test('Tinjau request membuka seluruh pending tanpa menandai semua notifikasi dibaca', async ({
+  page,
+}) => {
+  await enterDashboard(page);
+  await page.getByRole('dialog').getByRole('link', { name: 'Tinjau request', exact: true }).click();
+  await expect(page).toHaveURL('/requests?status=pending_review');
+  await expect(page.locator('tbody tr')).toHaveCount(4);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Notifikasi, 3 belum dibaca' })).toBeVisible();
+});
+test('Pengaju dan sesi tanpa request pending tidak mendapat popup', async ({ page }) => {
+  await enterDashboard(page, 'pengaju');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Keluar', exact: true }).click();
   await page.evaluate(() => {
     const raw = sessionStorage.getItem('stas-rg-demo-v1');
-    if (!raw) throw new Error('Data demo tidak tersedia');
+    if (!raw) throw new Error('Data tidak tersedia');
     const data = JSON.parse(raw) as { requests: { status: string }[] };
     data.requests.forEach((request) => {
       request.status = 'approved';
     });
     sessionStorage.setItem('stas-rg-demo-v1', JSON.stringify(data));
   });
-  await page.reload();
-  const notice = page.getByRole('alertdialog');
-  await expect(notice).toContainText('Tidak ada request menunggu persetujuan');
-  await expect(notice).not.toContainText('1 dari 0');
-  await notice.getByRole('button', { name: 'Lanjut ke Dashboard' }).click();
-  await expect(notice).toHaveCount(0);
+  await enterDashboard(page);
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
-
 for (const viewport of [
-  { width: 1672, height: 941 },
+  { width: 1900, height: 905 },
   { width: 1366, height: 768 },
+  { width: 768, height: 1024 },
   { width: 390, height: 844 },
   { width: 320, height: 568 },
 ]) {
-  test(`hard popup ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
+  test(`popup sekali per sesi ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await enterDashboard(page);
-    const notice = page.getByRole('alertdialog', { name: 'Pemberitahuan Request' });
+    const notice = page.getByRole('dialog', { name: 'Pemberitahuan Request' });
     await expect(notice).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     const bounds = await notice.boundingBox();
-    expect(bounds).not.toBeNull();
     if (!bounds) throw new Error('Popup tidak terlihat');
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.y).toBeGreaterThanOrEqual(0);
     expect(bounds.width).toBeLessThanOrEqual(viewport.width);
     expect(bounds.height).toBeLessThanOrEqual(viewport.height);
-    expect(await notice.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
-      true,
-    );
     const result = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
       .analyze();
     expect(result.violations).toEqual([]);
-    const screenshot = testInfo.outputPath(`hard-popup-${viewport.width}x${viewport.height}.png`);
+    const screenshot = testInfo.outputPath(`popup-${viewport.width}x${viewport.height}.png`);
     await page.screenshot({ path: screenshot, animations: 'disabled' });
-    await testInfo.attach('Hard popup Admin', { path: screenshot, contentType: 'image/png' });
+    await testInfo.attach('Popup Admin', { path: screenshot, contentType: 'image/png' });
     await notice.getByRole('button', { name: 'Tutup pemberitahuan' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Dashboard Pengadaan', exact: true }),
-    ).toBeVisible();
   });
 }

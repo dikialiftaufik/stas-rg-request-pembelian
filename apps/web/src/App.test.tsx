@@ -103,9 +103,7 @@ describe('akses dashboard demo', () => {
     await user.click(screen.getByRole('button', { name: 'Masuk ke Dashboard' }));
     await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
     if (role !== 'admin')
-      expect(
-        await screen.findByRole('heading', { level: 1, name: 'Dashboard Pengadaan' }),
-      ).toBeVisible();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
     expect(window.location.pathname).toBe('/dashboard');
     if (role === 'admin') {
       expect(await screen.findByRole('dialog', { name: 'Pemberitahuan Request' })).toBeVisible();
@@ -138,7 +136,7 @@ describe('rute workspace', () => {
     window.history.replaceState({}, '', '/tentang');
     const user = userEvent.setup();
     renderApp();
-    expect(screen.getByRole('heading', { name: 'Tentang workspace' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Tentang STAS-RG' })).toBeVisible();
     await user.click(screen.getByRole('link', { name: 'Kembali ke beranda' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Selamat datang kembali.');
     expect(screen.queryByText('Frontend lokal')).not.toBeInTheDocument();

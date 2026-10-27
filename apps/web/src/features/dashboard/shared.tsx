@@ -193,7 +193,6 @@ export function PageHeading({
 }: {
   title: string;
   description: string;
-  eyebrow?: string;
   action?: ReactNode;
 }) {
   return (

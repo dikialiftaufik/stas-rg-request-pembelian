@@ -45,7 +45,7 @@ describe('pemberitahuan pertama sesi Admin', () => {
     const user = userEvent.setup();
     const view = renderDashboard();
     await user.click(screen.getByRole('button', { name: 'Tutup pemberitahuan' }));
-    await user.click(screen.getByRole('link', { name: 'Request Pembelian' }));
+    await user.click(screen.getByRole('link', { name: 'Pembelian Barang' }));
     await user.click(screen.getByRole('link', { name: 'Dashboard' }));
     expect(popup()).not.toBeInTheDocument();
     view.unmount();

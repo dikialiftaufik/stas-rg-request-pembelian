@@ -57,9 +57,9 @@ test('validasi form menjelaskan kesalahan dan memfokuskan input', async ({ page 
 
 test('rute tentang dan halaman tidak ditemukan tetap berfungsi', async ({ page }) => {
   await page.goto('/tentang');
-  await expect(page.getByRole('heading', { name: 'Tentang workspace' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tentang STAS-RG' })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Tentang workspace' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tentang STAS-RG' })).toBeVisible();
   await page.getByRole('link', { name: 'Kembali ke beranda' }).click();
   await expect(page.getByLabel('ID / NIM / EMAIL')).toBeVisible();
   await page.goto('/tidak-ada');

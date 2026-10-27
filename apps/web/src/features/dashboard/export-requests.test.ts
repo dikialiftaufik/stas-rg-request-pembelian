@@ -15,7 +15,7 @@ describe('ekspor workbook', () => {
     const bytes = await buildRequestWorkbook(rows, data);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(bytes.buffer);
-    const sheet = workbook.getWorksheet('Request Pembelian');
+    const sheet = workbook.getWorksheet('Pembelian Barang');
     expect(sheet?.rowCount).toBe(3);
     expect(sheet?.getCell('A2').value).toBe(rows[0]?.item);
     expect(sheet?.getCell('A3').value).toBe(rows[1]?.item);

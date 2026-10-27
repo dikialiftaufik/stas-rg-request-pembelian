@@ -1,87 +1,87 @@
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { RabList } from './rab-list';
 import { useState } from 'react';
+import { Link, useSearchParams, useNavigate, useLocation } from 'react-router';
+import { toast } from 'sonner';
 import Decimal from 'decimal.js';
 import {
   ArrowTrendingUpIcon,
   CheckCircleIcon,
   ClockIcon,
   MagnifyingGlassIcon,
-  PencilSquareIcon,
   PlusIcon,
   ShoppingCartIcon,
-  TrashIcon,
-  ArrowsUpDownIcon,
   WalletIcon,
 } from '@heroicons/react/24/outline';
 import { useDemo } from '../demo/use-demo';
-import { dashboardSummary, scopedRequests, deleteUser, deleteResearch } from '../demo/store';
+import { dashboardSummary, deleteUser, deleteResearch } from '../demo/store';
 import { formatMoney, formatDate, researchUsed } from '../demo/model';
 import { demoAccounts } from '../demo/seed';
 import { ConfirmDialog, PageHeading, Pagination } from './shared';
-import { UserEditor, ResearchEditor } from './editors';
 import { RequestList } from './request-list';
 import { AdminDashboardNotice } from './admin-dashboard-notice';
+import { ActionMenu } from './action-menu';
+import { SortHeader } from './sort-header';
+import { readSort, userColumns, sortParams, sortUsers, representedResearch } from './table-sorting';
+import type { DemoUser } from '../demo/model';
+import { useRecordNavigation, rememberScroll } from './record-navigation';
 import styles from './dashboard.module.css';
 
 export function DashboardPage() {
   const { data, user } = useDemo();
-  const [now] = useState(() => new Date());
   if (!user) return null;
   const summary = dashboardSummary(data, user);
-  const scoped = scopedRequests(data, user);
-  const lastSevenDays = scoped.filter((item) => {
-    const created = new Date(item.createdAt).getTime();
-    return created >= now.getTime() - 7 * 86400000 && created <= now.getTime();
-  }).length;
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
-  const approvedToday = scoped.filter(
-    (item) =>
-      item.status === 'approved' &&
-      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(
-        new Date(item.createdAt),
-      ) === today,
-  ).length;
   const cards = [
     {
       label: 'Total Request',
       value: String(summary.total),
-      note: `+${lastSevenDays} dalam 7 hari`,
+      note: 'Seluruh pengajuan',
       icon: ShoppingCartIcon,
-      tone: 'green',
     },
     {
       label: 'Disetujui',
       value: String(summary.approved),
-      note: `+${approvedToday} hari ini`,
+      note: 'Siap untuk proses pembelian',
       icon: CheckCircleIcon,
-      tone: 'blue',
     },
-    { label: 'Menunggu', value: String(summary.pending), note: '', icon: ClockIcon, tone: 'amber' },
+    {
+      label: 'Menunggu',
+      value: String(summary.pending),
+      note: 'Menunggu peninjauan Admin',
+      icon: ClockIcon,
+    },
     {
       label: 'Total Nilai',
       value: summary.value.gte(1000000)
         ? `Rp ${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(summary.value.div(1000000).toNumber())} Jt`
         : formatMoney(summary.value),
-      note: '',
+      note: 'Nilai seluruh pengajuan',
       icon: ArrowTrendingUpIcon,
-      tone: 'indigo',
     },
   ];
   return (
     <>
       <PageHeading
-        title="Dashboard Pengadaan"
-        description="Selamat datang di sistem manajemen pengadaan riset STAS-RG"
-        action={<span className={styles.demoBadge}>Mode demo · Data contoh</span>}
+        title="Dashboard"
+        description={`Selamat datang, ${user.name}. Pantau Pembelian Barang riset Anda di sini.`}
+        action={
+          user.role === 'pengaju' ? (
+            <Link className={styles.primaryButton} to="/requests?create=1">
+              <PlusIcon aria-hidden="true" />
+              Buat request
+            </Link>
+          ) : undefined
+        }
       />
-      <section className={styles.stats} aria-label="Ringkasan pengadaan">
-        {cards.map(({ label, value, note, icon: Icon, tone }) => (
+      <section className={styles.stats} aria-label="Ringkasan Pembelian Barang">
+        {cards.map(({ label, value, note, icon: Icon }) => (
           <article className={styles.statCard} key={label} aria-label={label}>
             <div>
               <h2 className={styles.statLabel}>{label}</h2>
               <p className={styles.statValue}>{value}</p>
-              {note && <p className={styles.statTrend}>{note}</p>}
+              <p className={styles.statTrend}>{note}</p>
             </div>
-            <span className={styles.statIcon} data-tone={tone}>
+            <span className={styles.statIcon}>
               <Icon aria-hidden="true" />
             </span>
           </article>
@@ -95,108 +95,169 @@ export function DashboardPage() {
 
 export function RequestsPage() {
   const { user } = useDemo();
+  const [params] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = location.pathname === '/requests/rab' ? 'rab' : 'requests';
   return (
     <>
       <PageHeading
-        eyebrow={user?.role === 'admin' ? 'Monitoring operasional' : 'Pengajuan kebutuhan riset'}
-        title="Request Pembelian"
+        title="Pembelian Barang"
         description={
           user?.role === 'admin'
-            ? 'Kelola dan pantau request pembelian seluruh riset.'
+            ? 'Kelola dan pantau Pembelian Barang seluruh riset.'
             : 'Ajukan kebutuhan dan pantau proses pembelian Anda.'
         }
       />
-      <RequestList />
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(params);
+          next.delete('page');
+          void navigate(
+            `${value === 'rab' ? '/requests/rab' : '/requests'}${next.size ? `?${next}` : ''}`,
+          );
+        }}
+      >
+        <TabsList className="mb-6">
+          <TabsTrigger value="requests">Pembelian Barang</TabsTrigger>
+          <TabsTrigger value="rab">RAB</TabsTrigger>
+        </TabsList>
+        <TabsContent value="requests">
+          <RequestList />
+        </TabsContent>
+        <TabsContent value="rab">
+          <RabList />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }
 
-type EntityAction = { kind: 'create' } | { kind: 'edit' | 'delete'; id: string };
+type EntityAction = { kind: 'delete'; id: string };
+
+function ResearchAssignments({ user }: { user: DemoUser }) {
+  const { data } = useDemo();
+  const { link } = useRecordNavigation('/users');
+  const names = representedResearch(user, data);
+  return (
+    <>
+      <span className={styles.researchNames}>{names.slice(0, 2).join(', ') || '—'}</span>
+      {names.length > 2 && (
+        <Link
+          className={styles.inlineButton}
+          aria-label={`Lihat semua perwakilan riset ${user.name}`}
+          to={link(`/users/${user.id}`)}
+        >
+          +{names.length - 2} riset
+        </Link>
+      )}
+    </>
+  );
+}
+const userHeaders = [
+  ['name', 'Nama lengkap'],
+  ['identifier', 'NIP/NIM'],
+  ['email', 'Email'],
+  ['role', 'Peran'],
+  ['research', 'Perwakilan riset'],
+  ['createdAt', 'Tanggal dibuat'],
+] as const;
 
 export function UsersPage() {
   const { data } = useDemo();
-  const [query, setQuery] = useState('');
-  const [descending, setDescending] = useState(false);
-  const [pageValue, setPage] = useState(1);
-  const [size, setSize] = useState(5);
+  const { link } = useRecordNavigation('/users');
+  const [params, setParams] = useSearchParams();
   const [action, setAction] = useState<EntityAction | null>(null);
-  const users = data.users
-    .filter((user) =>
-      `${user.name} ${user.identifier} ${user.email} ${user.researchIds.map((id) => data.research.find((item) => item.id === id)?.name ?? '').join(' ')}`
+  const query = params.get('q') ?? '';
+  const sort = readSort(params, userColumns, 'name', 'asc');
+  const requestedSize = Number(params.get('size'));
+  const size = [5, 10, 20].includes(requestedSize) ? requestedSize : 5;
+  const users = sortUsers(
+    data.users.filter((user) =>
+      `${user.name} ${user.identifier} ${user.email} ${representedResearch(user, data).join(' ')}`
         .toLocaleLowerCase('id')
         .includes(query.toLocaleLowerCase('id').trim()),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, 'id') * (descending ? -1 : 1));
-  const page = Math.min(pageValue, Math.max(1, Math.ceil(users.length / size)));
+    ),
+    data,
+    sort.key,
+    sort.direction,
+  );
+  const requestedPage = Number(params.get('page'));
+  const page = Math.max(
+    1,
+    Math.min(
+      Number.isInteger(requestedPage) ? requestedPage : 1,
+      Math.max(1, Math.ceil(users.length / size)),
+    ),
+  );
   const editing =
     action && 'id' in action ? data.users.find((item) => item.id === action.id) : undefined;
   const close = () => setAction(null);
+  function choose(next: EntityAction) {
+    setAction(next);
+  }
+  function update(key: string, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (key !== 'page') next.delete('page');
+    setParams(next, { replace: true });
+  }
   return (
     <>
       <PageHeading
-        eyebrow="Administrasi akses"
         title="Manajemen Pengguna"
-        description="Kelola akun, peran, dan penugasan jenis riset."
+        description="Kelola akun, peran, dan perwakilan riset."
         action={
-          <button
-            type="button"
-            className={styles.primaryButton}
-            onClick={() => setAction({ kind: 'create' })}
-          >
+          <Link className={styles.primaryButton} to={link('/users/new')} onClick={rememberScroll}>
             <PlusIcon aria-hidden="true" />
             Tambah Pengguna
-          </button>
+          </Link>
         }
       />
-      <section className={styles.contentCard} aria-label="Daftar pengguna">
-        <div className={styles.toolbar}>
+      <section className={styles.dataPanel} aria-label="Daftar pengguna">
+        <div className={styles.filters}>
           <div className={styles.search}>
             <MagnifyingGlassIcon aria-hidden="true" />
             <input
               type="search"
               aria-label="Cari pengguna"
-              placeholder="Cari nama, NIP/NIM, email, atau riset..."
+              placeholder="Cari nama, NIP/NIM, email, atau riset…"
               value={query}
-              onInput={(event) => {
-                setQuery(event.currentTarget.value);
-                setPage(1);
-              }}
+              onInput={(event) => update('q', event.currentTarget.value)}
             />
           </div>
-          <button
-            className={styles.secondaryButton}
-            type="button"
-            onClick={() => setDescending((value) => !value)}
-            aria-label={`Urutkan nama ${descending ? 'A ke Z' : 'Z ke A'}`}
-          >
-            <ArrowsUpDownIcon aria-hidden="true" />
-            Urutkan nama
-          </button>
         </div>
         <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Tabel pengguna">
-          <table className={styles.table}>
-            <caption className="sr-only">Pengguna dan penugasan riset</caption>
+          <table className={`${styles.table} ${styles.usersTable}`}>
+            <caption className="sr-only">Pengguna dan perwakilan riset</caption>
             <thead>
               <tr>
-                {[
-                  'Nama lengkap',
-                  'NIP/NIM',
-                  'Email',
-                  'Role',
-                  'Jenis riset',
-                  'Tanggal dibuat',
-                  'Aksi',
-                ].map((label) => (
-                  <th key={label} scope="col">
-                    {label}
-                  </th>
+                {userHeaders.map(([key, label]) => (
+                  <SortHeader
+                    key={key}
+                    label={label}
+                    active={sort.key === key}
+                    direction={sort.direction}
+                    onSort={() =>
+                      setParams(sortParams(params, key, sort.key, sort.direction), {
+                        replace: true,
+                      })
+                    }
+                  />
                 ))}
+                <th scope="col">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {users.slice((page - 1) * size, page * size).map((user) => (
                 <tr key={user.id}>
-                  <td>{user.name}</td>
+                  <td className={styles.itemCell}>
+                    <Link className={styles.textLink} to={link(`/users/${user.id}`)}>
+                      {user.name}
+                    </Link>
+                  </td>
                   <td>{user.identifier}</td>
                   <td>{user.email}</td>
                   <td>
@@ -205,66 +266,55 @@ export function UsersPage() {
                     </span>
                   </td>
                   <td>
-                    {user.researchIds
-                      .map((id) => data.research.find((item) => item.id === id)?.name)
-                      .join(', ') || '—'}
+                    <ResearchAssignments user={user} />
                   </td>
-                  <td>{formatDate(user.createdAt)}</td>
+                  <td className={styles.dateCell}>{formatDate(user.createdAt)}</td>
                   <td>
-                    <div className={styles.rowActions}>
-                      <button
-                        className={styles.iconButton}
-                        data-action="edit"
-                        type="button"
-                        aria-label={`Edit ${user.name}`}
-                        onClick={() => setAction({ kind: 'edit', id: user.id })}
-                      >
-                        <PencilSquareIcon aria-hidden="true" />
-                      </button>
-                      <button
-                        className={styles.iconButton}
-                        data-action="delete"
-                        type="button"
-                        aria-label={`Hapus ${user.name}`}
-                        title={
-                          demoAccounts.some((item) => item.id === user.id)
-                            ? 'Akun demo utama tidak dapat dihapus'
-                            : 'Hapus pengguna'
-                        }
-                        disabled={demoAccounts.some((item) => item.id === user.id)}
-                        onClick={() => setAction({ kind: 'delete', id: user.id })}
-                      >
-                        <TrashIcon aria-hidden="true" />
-                      </button>
-                    </div>
+                    <ActionMenu
+                      label={`Aksi ${user.name}`}
+                      items={[
+                        {
+                          label: `Edit ${user.name}`,
+                          to: link(`/users/${user.id}/edit`),
+                        },
+                        {
+                          label: `Hapus ${user.name}`,
+                          danger: true,
+                          disabled: demoAccounts.some((account) => account.id === user.id),
+                          hint: 'Akun demo utama tidak dapat dihapus',
+                          onSelect: () => choose({ kind: 'delete', id: user.id }),
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {users.length === 0 && (
-            <p className={styles.empty}>Tidak ada pengguna yang sesuai pencarian.</p>
+            <div className={styles.empty}>
+              <strong>Tidak ada pengguna yang sesuai.</strong>
+              <p>Coba nama atau email lainnya.</p>
+            </div>
           )}
         </div>
         <Pagination
           count={users.length}
           page={page}
           pageSize={size}
-          onPage={setPage}
-          onPageSize={(value) => {
-            setSize(value);
-            setPage(1);
-          }}
+          onPage={(value) => update('page', String(value))}
+          onPageSize={(value) => update('size', String(value))}
         />
       </section>
-      {action?.kind === 'create' && <UserEditor onClose={close} />}
-      {action?.kind === 'edit' && editing && <UserEditor user={editing} onClose={close} />}
       {action?.kind === 'delete' && editing && (
         <ConfirmDialog
           title="Hapus Pengguna"
           description={`Hapus ${editing.name} dari data contoh? Pengguna yang masih dirujuk request tidak dapat dihapus.`}
           confirmLabel="Hapus Pengguna"
-          onConfirm={() => deleteUser(editing.id)}
+          onConfirm={() => {
+            deleteUser(editing.id);
+            toast.success('Pengguna berhasil dihapus.');
+          }}
           onClose={close}
         />
       )}
@@ -274,7 +324,15 @@ export function UsersPage() {
 
 export function ResearchPage() {
   const { data } = useDemo();
-  const [query, setQuery] = useState('');
+  const { link } = useRecordNavigation('/research-types');
+  const [params, setParams] = useSearchParams();
+  const query = params.get('q') ?? '';
+  const setQuery = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set('q', value);
+    else next.delete('q');
+    setParams(next, { replace: true });
+  };
   const [action, setAction] = useState<EntityAction | null>(null);
   const allocation = data.research.reduce((sum, item) => sum.plus(item.allocated), new Decimal(0));
   const used = data.research.reduce(
@@ -289,21 +347,23 @@ export function ResearchPage() {
   const editing =
     action && 'id' in action ? data.research.find((item) => item.id === action.id) : undefined;
   const close = () => setAction(null);
+  function choose(next: EntityAction) {
+    setAction(next);
+  }
   return (
     <>
       <PageHeading
-        eyebrow="Monitoring pendanaan"
         title="Jenis Riset"
         description="Pantau alokasi, pemakaian, dan sisa dana setiap proyek."
         action={
-          <button
+          <Link
             className={styles.primaryButton}
-            type="button"
-            onClick={() => setAction({ kind: 'create' })}
+            to={link('/research-types/new')}
+            onClick={rememberScroll}
           >
             <PlusIcon aria-hidden="true" />
             Tambah Jenis Riset
-          </button>
+          </Link>
         }
       />
       <div className={styles.sectionHeading}>
@@ -316,7 +376,7 @@ export function ResearchPage() {
       >
         {[
           ['Total alokasi', allocation],
-          ['Sudah digunakan', used],
+          ['Dana berkomitmen', used],
           ['Sisa dana', allocation.minus(used)],
         ].map(([label, value]) => (
           <article className={styles.statCard} key={String(label)}>
@@ -335,7 +395,7 @@ export function ResearchPage() {
         <input
           type="search"
           aria-label="Cari jenis riset"
-          placeholder="Cari jenis riset..."
+          placeholder="Cari jenis riset…"
           value={query}
           onInput={(event) => setQuery(event.currentTarget.value)}
         />
@@ -346,19 +406,23 @@ export function ResearchPage() {
           const percent = spending.div(item.allocated).times(100).toDecimalPlaces(0).toNumber();
           return (
             <article className={styles.researchCard} key={item.id}>
-              <h2>{item.name}</h2>
+              <h2>
+                <Link className={styles.textLink} to={link(`/research-types/${item.id}`)}>
+                  {item.name}
+                </Link>
+              </h2>
               <p>
                 {
                   data.requests.filter(
                     (request) => !request.deleted && request.researchId === item.id,
                   ).length
                 }{' '}
-                request tercatat · {percent}% terpakai
+                request tercatat · {percent}% terikat
               </p>
-              <progress value={percent} max={100} aria-label={`Pemakaian dana ${item.name}`} />
+              <progress value={percent} max={100} aria-label={`Komitmen dana ${item.name}`} />
               <div className={styles.researchMoney}>
                 <div>
-                  <span>Terpakai</span>
+                  <span>Komitmen</span>
                   <strong>{formatMoney(spending)}</strong>
                 </div>
                 <div>
@@ -367,22 +431,20 @@ export function ResearchPage() {
                 </div>
               </div>
               <div className={styles.researchActions}>
-                <button
-                  className={styles.iconButton}
-                  type="button"
-                  aria-label={`Edit ${item.name}`}
-                  onClick={() => setAction({ kind: 'edit', id: item.id })}
-                >
-                  <PencilSquareIcon aria-hidden="true" />
-                </button>
-                <button
-                  className={styles.iconButton}
-                  type="button"
-                  aria-label={`Hapus ${item.name}`}
-                  onClick={() => setAction({ kind: 'delete', id: item.id })}
-                >
-                  <TrashIcon aria-hidden="true" />
-                </button>
+                <ActionMenu
+                  label={`Aksi ${item.name}`}
+                  items={[
+                    {
+                      label: `Edit ${item.name}`,
+                      to: link(`/research-types/${item.id}/edit`),
+                    },
+                    {
+                      label: `Hapus ${item.name}`,
+                      danger: true,
+                      onSelect: () => choose({ kind: 'delete', id: item.id }),
+                    },
+                  ]}
+                />
               </div>
             </article>
           );
@@ -391,14 +453,15 @@ export function ResearchPage() {
       {filtered.length === 0 && (
         <p className={styles.empty}>Tidak ada jenis riset yang sesuai pencarian.</p>
       )}
-      {action?.kind === 'create' && <ResearchEditor onClose={close} />}
-      {action?.kind === 'edit' && editing && <ResearchEditor research={editing} onClose={close} />}
       {action?.kind === 'delete' && editing && (
         <ConfirmDialog
           title="Hapus Jenis Riset"
           description={`Hapus ${editing.name}? Riset yang masih dirujuk request atau pengguna tidak dapat dihapus.`}
           confirmLabel="Hapus Jenis Riset"
-          onConfirm={() => deleteResearch(editing.id)}
+          onConfirm={() => {
+            deleteResearch(editing.id);
+            toast.success('Jenis riset berhasil dihapus.');
+          }}
           onClose={close}
         />
       )}
