@@ -1,8 +1,10 @@
 import { Link, useSearchParams } from 'react-router';
 import { FormSelect } from '@/components/ui/form-select';
+import { ThemedSelect } from '@/components/ui/themed-select';
+import { z } from 'zod';
 import { toast } from 'sonner';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import Decimal from 'decimal.js';
 import { useDemo } from '../demo/use-demo';
 import { saveRequest, saveResearch, saveUser, scopedRabs } from '../demo/store';
@@ -31,19 +33,32 @@ import { FieldGroup } from '@/components/ui/field';
 import { fieldAttributes } from './form-utils';
 import styles from './dashboard.module.css';
 
-function FormActions({ onClose, label = 'Simpan' }: { onClose: () => void; label?: string }) {
+function FormActions({
+  onClose,
+  label = 'Simpan',
+  disabled = false,
+}: {
+  onClose: () => void;
+  label?: string;
+  disabled?: boolean;
+}) {
   return (
     <div className={`${styles.dialogActions} ${styles.fullField}`}>
       <button className={styles.secondaryButton} type="button" onClick={onClose}>
         Kembali
       </button>
-      <button className={styles.primaryButton} type="submit">
+      <button className={styles.primaryButton} type="submit" disabled={disabled}>
         {label}
       </button>
     </div>
   );
 }
 
+type RequestFormValues = RequestInput & {
+  sourceMode: 'manual' | 'rab';
+  documentId: string;
+  itemId: string;
+};
 export function RequestEditor({
   request,
   onClose,
@@ -56,68 +71,118 @@ export function RequestEditor({
   const { data, user } = useDemo();
   const limits = requestDateLimits();
   const [params] = useSearchParams();
-  const sourceDoc =
-    !request && user
-      ? scopedRabs(data, user).find((doc) => doc.id === params.get('sourceRab') && doc.active)
-      : undefined;
-  const sourceItem = sourceDoc?.items.find((item) => item.id === params.get('sourceItem'));
-  const invalidSource = !request && params.has('sourceRab') && !sourceItem;
-  const schema = requestInputSchema.refine(
-    (value) =>
-      value.requiredDate === request?.requiredDate || validateRequestDate(value.requiredDate),
-    {
-      path: ['requiredDate'],
-      message: 'Pilih tanggal H-3 hari kerja sampai maksimal 180 hari ke depan.',
-    },
-  );
+  const documents = user ? scopedRabs(data, user).filter((doc) => doc.active) : [];
+  const initialDoc = documents.find((doc) => doc.id === params.get('sourceRab'));
+  const initialItem = initialDoc?.items.find((item) => item.id === params.get('sourceItem'));
+  const schema = requestInputSchema
+    .extend({
+      sourceMode: z.enum(['manual', 'rab']),
+      documentId: z.string(),
+      itemId: z.string(),
+    })
+    .refine(
+      (value) =>
+        value.requiredDate === request?.requiredDate || validateRequestDate(value.requiredDate),
+      {
+        path: ['requiredDate'],
+        message: 'Pilih tanggal H-3 hari kerja sampai maksimal 180 hari ke depan.',
+      },
+    )
+    .superRefine((values, context) => {
+      if (request || values.sourceMode !== 'rab') return;
+      const document = documents.find((doc) => doc.id === values.documentId);
+      if (!document)
+        context.addIssue({
+          code: 'custom',
+          path: ['documentId'],
+          message: 'Pilih RAB aktif untuk riset Anda.',
+        });
+      else if (!document.items.some((item) => item.id === values.itemId))
+        context.addIssue({
+          code: 'custom',
+          path: ['itemId'],
+          message: 'Pilih barang yang tersedia pada RAB.',
+        });
+    });
   const {
     register,
     handleSubmit,
     control,
     setError,
-    formState: { errors, isDirty },
-  } = useForm<RequestInput>({
+    setValue,
+    setFocus,
+    formState: { errors, isDirty, isSubmitted },
+  } = useForm<RequestFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: request ?? {
-      item: sourceItem?.name ?? '',
-      unit: sourceItem?.unit ?? 'unit',
-      researchId: sourceDoc?.researchId ?? user?.researchIds[0] ?? '',
-      quantity: sourceItem?.quantity ?? 1,
-      unitPrice: sourceItem?.unitPrice ?? '',
+    shouldFocusError: false,
+    defaultValues: {
+      item: initialItem?.name ?? '',
+      unit: initialItem?.unit ?? 'unit',
+      researchId: user?.researchIds[0] ?? '',
+      quantity: initialItem?.quantity ?? 1,
+      unitPrice: initialItem?.unitPrice ?? '',
       requiredDate: limits.minimum,
       url: '',
-      notes: sourceItem?.notes ?? '',
+      notes: initialItem?.notes ?? '',
+      ...request,
+      sourceMode: params.has('sourceRab') || params.get('source') === 'rab' ? 'rab' : 'manual',
+      documentId: initialDoc?.id ?? '',
+      itemId: initialItem?.id ?? '',
     },
   });
   const { guard, markSaved } = useUnsavedChanges(isDirty);
   const { back } = useRecordNavigation();
   const [quantity, unitPrice] = useWatch({ control, name: ['quantity', 'unitPrice'] });
+  const [sourceMode, documentId] = useWatch({ control, name: ['sourceMode', 'documentId'] });
+  const researchId = useWatch({ control, name: 'researchId' });
+  const sourceDoc = documents.find((doc) => doc.id === documentId);
+  const assigned = data.research.find((project) => project.id === researchId);
+  function selectItem(docId: string, itemId: string) {
+    const item = documents
+      .find((doc) => doc.id === docId)
+      ?.items.find((entry) => entry.id === itemId);
+    setValue('itemId', itemId, { shouldDirty: true, shouldValidate: isSubmitted });
+    setValue('item', item?.name ?? '', { shouldDirty: true, shouldValidate: isSubmitted });
+    setValue('unit', item?.unit ?? 'unit', { shouldDirty: true, shouldValidate: isSubmitted });
+    setValue('quantity', item?.quantity ?? 1, { shouldDirty: true, shouldValidate: isSubmitted });
+    setValue('unitPrice', item?.unitPrice ?? '', {
+      shouldDirty: true,
+      shouldValidate: isSubmitted,
+    });
+    setValue('notes', item?.notes ?? '', { shouldDirty: true });
+  }
   const total =
     moneySchema.safeParse(unitPrice).success && Number.isFinite(quantity)
       ? new Decimal(unitPrice).times(quantity)
       : new Decimal(0);
-  const submit = handleSubmit((values) => {
-    try {
-      if (invalidSource)
-        throw new Error(
-          'Barang RAB tidak tersedia. Pilih barang dari RAB aktif atau buat request manual.',
+  const submit = handleSubmit(
+    (values) => {
+      try {
+        const savedId = saveRequest(
+          values,
+          request?.id,
+          !request && values.sourceMode === 'rab'
+            ? { documentId: values.documentId, itemId: values.itemId }
+            : undefined,
         );
-      const savedId = saveRequest(
-        values,
-        request?.id,
-        sourceDoc && sourceItem && sourceDoc.researchId === values.researchId
-          ? { documentId: sourceDoc.id, itemId: sourceItem.id }
-          : undefined,
-      );
-      toast.success(request ? 'Request berhasil diperbarui.' : 'Request berhasil diajukan.');
-      markSaved();
-      onSaved(savedId);
-    } catch (error) {
-      setError('root', {
-        message: error instanceof Error ? error.message : 'Request gagal disimpan.',
-      });
-    }
-  });
+        toast.success(request ? 'Request berhasil diperbarui.' : 'Request berhasil diajukan.');
+        markSaved();
+        onSaved(savedId);
+      } catch (error) {
+        setError('root', {
+          message: error instanceof Error ? error.message : 'Request gagal disimpan.',
+        });
+      }
+    },
+    (issues) => {
+      const first = issues.documentId
+        ? 'documentId'
+        : issues.itemId
+          ? 'itemId'
+          : (Object.keys(issues)[0] as keyof RequestFormValues | undefined);
+      if (first) setFocus(first);
+    },
+  );
   return (
     <RecordPage
       title={request ? 'Edit Pembelian Barang' : 'Buat request'}
@@ -133,23 +198,26 @@ export function RequestEditor({
           <p className={styles.hint}>
             Persetujuan mengikuti sisa alokasi riset. Nilai invoice dicatat secara terpisah.
           </p>
+          <p className={styles.hint}>
+            {request ? 'Riset barang' : 'Riset perwakilan'}:{' '}
+            <strong>{assigned?.name ?? 'Belum ditetapkan'}</strong>
+          </p>
         </RecordCard>
       }
     >
       <RecordCard title="Informasi barang">
-        {!request && (
-          <p className={styles.dialogDescription}>
-            {sourceItem
-              ? `Diisi dari ${sourceDoc?.name ?? 'RAB'}. Jumlah dan harga dapat disesuaikan.`
-              : 'Ajukan barang manual atau pilih dari daftar RAB riset Anda.'}{' '}
-            <Link className={styles.textLink} to="/requests?tab=rab">
-              Pilih dari RAB
-            </Link>
+        {!request && (!assigned || user?.researchIds.length !== 1) && (
+          <p className={styles.formError} role="alert">
+            Riset perwakilan belum valid. Minta Admin menetapkan tepat satu riset pada profil Anda
+            sebelum mengajukan barang.
           </p>
         )}
-        {invalidSource && (
-          <p className={styles.formError} role="alert">
-            Barang RAB tidak tersedia. <Link to="/requests?create=1">Buat request manual</Link>.
+        {!request && (
+          <p className={styles.dialogDescription}>
+            Riset mengikuti akun perwakilan Anda. Pilih pengajuan manual atau barang dari RAB aktif.{' '}
+            <Link className={styles.textLink} to="/requests/rab">
+              Lihat daftar RAB
+            </Link>
           </p>
         )}
         <form
@@ -159,26 +227,136 @@ export function RequestEditor({
           onSubmit={(event) => void submit(event)}
         >
           <FieldGroup className={styles.formGrid}>
+            {!request && (
+              <>
+                <div className={styles.fullField}>
+                  <Field id="request-source" label="Sumber pengajuan">
+                    <Controller
+                      control={control}
+                      name="sourceMode"
+                      render={({ field }) => (
+                        <ThemedSelect
+                          id="request-source"
+                          value={field.value}
+                          triggerRef={field.ref}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            setValue('documentId', '', { shouldDirty: true });
+                            selectItem('', '');
+                          }}
+                          options={[
+                            { value: 'manual', label: 'Manual · barang di luar RAB' },
+                            { value: 'rab', label: 'Dari RAB · pilih barang terdaftar' },
+                          ]}
+                        />
+                      )}
+                    />
+                  </Field>
+                </div>
+                {sourceMode === 'rab' && (
+                  <>
+                    <Field
+                      id="request-rab"
+                      label="Dokumen RAB"
+                      error={errors.documentId?.message}
+                      hint={
+                        documents.length
+                          ? 'Hanya RAB aktif untuk riset perwakilan Anda.'
+                          : 'RAB belum tersedia. Minta Admin mengunggah RAB atau gunakan pengajuan manual.'
+                      }
+                    >
+                      <Controller
+                        control={control}
+                        name="documentId"
+                        render={({ field, fieldState }) => (
+                          <ThemedSelect
+                            id="request-rab"
+                            name={field.name}
+                            value={field.value}
+                            triggerRef={field.ref}
+                            onBlur={field.onBlur}
+                            invalid={!!fieldState.error}
+                            describedBy={
+                              fieldState.error ? 'request-rab-error' : 'request-rab-hint'
+                            }
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              selectItem(value, '');
+                            }}
+                            options={[
+                              { value: '', label: 'Pilih dokumen RAB' },
+                              ...documents.map((doc) => ({
+                                value: doc.id,
+                                label: `${doc.name} · Versi ${doc.version}`,
+                              })),
+                            ]}
+                          />
+                        )}
+                      />
+                    </Field>
+                    <Field
+                      id="request-rab-item"
+                      label="Barang dalam RAB"
+                      error={errors.itemId?.message}
+                      hint="Nama dan satuan mengikuti RAB; jumlah dan harga perkiraan dapat disesuaikan."
+                    >
+                      <Controller
+                        control={control}
+                        name="itemId"
+                        render={({ field, fieldState }) => (
+                          <ThemedSelect
+                            id="request-rab-item"
+                            name={field.name}
+                            value={field.value}
+                            triggerRef={field.ref}
+                            onBlur={field.onBlur}
+                            disabled={!sourceDoc}
+                            invalid={!!fieldState.error}
+                            describedBy={
+                              fieldState.error ? 'request-rab-item-error' : 'request-rab-item-hint'
+                            }
+                            onValueChange={(value) => selectItem(documentId, value)}
+                            options={[
+                              { value: '', label: 'Pilih barang RAB' },
+                              ...(sourceDoc?.items.map((item) => ({
+                                value: item.id,
+                                label: item.name,
+                              })) ?? []),
+                            ]}
+                          />
+                        )}
+                      />
+                    </Field>
+                  </>
+                )}
+                <input type="hidden" {...register('researchId')} />
+              </>
+            )}
             <Field id="request-item" label="Nama barang" error={errors.item?.message}>
               <input
                 {...register('item')}
                 {...fieldAttributes('request-item', errors.item?.message)}
                 required
+                readOnly={!request && sourceMode === 'rab'}
               />
             </Field>
-            <Field id="request-research" label="Jenis riset" error={errors.researchId?.message}>
-              <FormSelect
-                control={control}
-                name="researchId"
-                id="request-research"
-                options={[
-                  { value: '', label: 'Pilih jenis riset' },
-                  ...data.research
-                    .filter((item) => user?.role === 'admin' || user?.researchIds.includes(item.id))
-                    .map((item) => ({ value: item.id, label: item.name })),
-                ]}
-              />
-            </Field>
+            {request && (
+              <Field id="request-research" label="Jenis riset" error={errors.researchId?.message}>
+                <FormSelect
+                  control={control}
+                  name="researchId"
+                  id="request-research"
+                  options={[
+                    { value: '', label: 'Pilih jenis riset' },
+                    ...data.research
+                      .filter(
+                        (item) => user?.role === 'admin' || user?.researchIds.includes(item.id),
+                      )
+                      .map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                />
+              </Field>
+            )}
             <Field id="request-quantity" label="Jumlah" error={errors.quantity?.message}>
               <input
                 {...register('quantity', { valueAsNumber: true })}
@@ -194,6 +372,7 @@ export function RequestEditor({
                 {...register('unit')}
                 {...fieldAttributes('request-unit', errors.unit?.message)}
                 placeholder="unit, set, atau paket"
+                readOnly={!request && sourceMode === 'rab'}
                 required
               />
             </Field>
@@ -249,6 +428,7 @@ export function RequestEditor({
             <FormActions
               onClose={onClose}
               label={request ? 'Simpan Perubahan' : 'Ajukan Request'}
+              disabled={!request && (!assigned || user?.researchIds.length !== 1)}
             />
           </FieldGroup>
         </form>
@@ -368,28 +548,40 @@ export function UserEditor({
               )}
             </Field>
             {role === 'pengaju' && (
-              <fieldset
-                className={`${styles.fieldset} ${styles.fullField}`}
-                aria-describedby={errors.researchIds ? 'research-assignment-error' : undefined}
-              >
-                <legend>Perwakilan riset</legend>
-                {data.research.map((item) => (
-                  <label key={item.id} htmlFor={`assignment-${item.id}`}>
-                    <input
-                      id={`assignment-${item.id}`}
-                      type="checkbox"
-                      value={item.id}
-                      {...register('researchIds')}
-                    />
-                    {item.name}
-                  </label>
-                ))}
-                {errors.researchIds?.message && (
-                  <p id="research-assignment-error" className={styles.formError} role="alert">
-                    {errors.researchIds.message}
-                  </p>
-                )}
-              </fieldset>
+              <div className={styles.fullField}>
+                <Field
+                  id="user-research"
+                  label="Perwakilan riset"
+                  error={errors.researchIds?.message}
+                  hint="Satu akun Pengaju mewakili satu riset; pengajuan mengikuti riset ini secara otomatis."
+                >
+                  <Controller
+                    control={control}
+                    name="researchIds"
+                    render={({ field, fieldState }) => (
+                      <ThemedSelect
+                        id="user-research"
+                        name={field.name}
+                        value={field.value[0] ?? ''}
+                        triggerRef={field.ref}
+                        onBlur={field.onBlur}
+                        onValueChange={(value) => field.onChange(value ? [value] : [])}
+                        invalid={!!fieldState.error}
+                        describedBy={
+                          fieldState.error ? 'user-research-error' : 'user-research-hint'
+                        }
+                        options={[
+                          { value: '', label: 'Pilih riset perwakilan' },
+                          ...data.research.map((project) => ({
+                            value: project.id,
+                            label: project.name,
+                          })),
+                        ]}
+                      />
+                    )}
+                  />
+                </Field>
+              </div>
             )}
             {errors.root?.message && (
               <p className={`${styles.formError} ${styles.fullField}`} role="alert">

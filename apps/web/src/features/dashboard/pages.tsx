@@ -110,7 +110,7 @@ export function DashboardPage() {
         <Suspense
           fallback={
             <section className={styles.agendaPanel} aria-label="Memuat analitik pribadi">
-              <p role="status">Memuat kebutuhan barang…</p>
+              <p role="status">Memuat analitik pengajuan…</p>
             </section>
           }
         >
@@ -124,7 +124,7 @@ export function DashboardPage() {
 }
 
 export function RequestsPage() {
-  const { user } = useDemo();
+  const { data, user } = useDemo();
   const [params] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -136,7 +136,7 @@ export function RequestsPage() {
         description={
           user?.role === 'admin'
             ? 'Kelola dan pantau Pembelian Barang seluruh riset.'
-            : 'Ajukan kebutuhan dan pantau proses pembelian Anda.'
+            : `Perwakilan ${data.research.find((project) => project.id === user?.researchIds[0])?.name ?? 'riset belum ditetapkan'}. Ajukan manual atau pilih barang dari RAB aktif.`
         }
       />
       <Tabs

@@ -108,6 +108,7 @@ export function RabDetails({ doc }: { doc: RabDocument }) {
           <p>
             {data.research.find((item) => item.id === doc.researchId)?.name} · Versi {doc.version} ·{' '}
             {doc.active ? 'Aktif' : 'Arsip'} · {formatDate(doc.createdAt)}
+            {doc.sourceKind === 'demo' && ' · Contoh unggahan Admin'}
           </p>
         </div>
         <div>
@@ -338,6 +339,7 @@ export function RabList() {
                 <span className={styles.hint}>
                   {data.research.find((item) => item.id === doc.researchId)?.name} · Versi{' '}
                   {doc.version} {doc.active ? 'aktif' : 'arsip'}
+                  {doc.sourceKind === 'demo' && ' · Contoh unggahan Admin'}
                 </span>
                 <h3>{doc.name}</h3>
                 <p>

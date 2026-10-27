@@ -29,6 +29,8 @@ import { createSeed, demoAccounts } from './seed';
 import { allowedNextStatuses } from './request-workflow';
 import { getAttachment, putAttachment, removeAttachment } from './attachment-db';
 import { validateFile } from './file-validation';
+import { upgradeDemo } from './upgrade-demo';
+import { demoRabCsv } from './demo-rab';
 
 export const DEMO_STORAGE_KEY = 'stas-rg-demo-v1';
 let snapshot: DemoSnapshot | undefined;
@@ -38,7 +40,15 @@ export function getSnapshot(): DemoSnapshot {
   if (!snapshot) {
     try {
       const saved = sessionStorage.getItem(DEMO_STORAGE_KEY);
-      snapshot = saved ? snapshotSchema.parse(JSON.parse(saved) as unknown) : createSeed();
+      const parsed = saved ? snapshotSchema.parse(JSON.parse(saved) as unknown) : createSeed();
+      snapshot = snapshotSchema.parse(upgradeDemo(parsed));
+      if (snapshot.demoRevision !== parsed.demoRevision) {
+        try {
+          sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(snapshot));
+        } catch {
+          /* Restricted storage retains the upgraded snapshot in memory. */
+        }
+      }
     } catch {
       snapshot = createSeed();
     }
@@ -137,8 +147,16 @@ export function saveRequest(
 ) {
   const user = requireUser(Boolean(id));
   if (!id && user.role !== 'pengaju') throw new Error('Pembuatan request tersedia untuk Pengaju.');
-  const values = requestInputSchema.parse(input);
   const data = getSnapshot();
+  if (!id && user.researchIds.length !== 1)
+    throw new Error(
+      'Akun Pengaju harus mewakili tepat satu riset. Minta Admin memperbarui profil Anda.',
+    );
+  const values = requestInputSchema.parse(input);
+  if (!id && values.researchId !== user.researchIds[0])
+    throw new Error(
+      'Riset pengajuan harus sesuai riset perwakilan akun. Muat ulang form atau hubungi Admin.',
+    );
   const existing = id ? visibleRequest(id) : undefined;
   const research = data.research.find((item) => item.id === values.researchId);
   if (!research || (user.role === 'pengaju' && !user.researchIds.includes(research.id)))
@@ -150,12 +168,11 @@ export function saveRequest(
     throw new Error('Tanggal kebutuhan harus H-3 hari kerja sampai maksimal 180 hari ke depan.');
   if (source) {
     const doc = visibleRab(source.documentId);
-    if (
-      !doc.active ||
-      doc.researchId !== values.researchId ||
-      !doc.items.some((item) => item.id === source.itemId)
-    )
+    const selected = doc.items.find((item) => item.id === source.itemId);
+    if (!doc.active || doc.researchId !== values.researchId || !selected)
       throw new Error('Barang RAB tidak tersedia untuk riset ini. Pilih barang dari RAB aktif.');
+    if (values.item !== selected.name || values.unit !== selected.unit)
+      throw new Error('Nama dan satuan harus sesuai barang RAB yang dipilih. Pilih ulang barang.');
   }
   const request = existing
     ? {
@@ -448,7 +465,11 @@ export async function loadInvoiceFile(requestId: string) {
   return blob;
 }
 export async function loadRabFile(documentId: string) {
-  const blob = await getAttachment(visibleRab(documentId).source);
+  const doc = visibleRab(documentId);
+  const blob =
+    doc.sourceKind === 'demo'
+      ? new Blob([demoRabCsv(doc.items)], { type: 'text/csv' })
+      : await getAttachment(doc.source);
   visibleRab(documentId);
   return blob;
 }
@@ -587,6 +608,7 @@ export async function importRab(input: {
       version,
       active: true,
       source: stored,
+      sourceKind: 'upload',
       createdAt: new Date().toISOString(),
       createdBy: user.id,
       items,

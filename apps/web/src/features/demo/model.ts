@@ -32,8 +32,8 @@ export const userInputSchema = z
     role: roleSchema,
     researchIds: z.array(z.string()),
   })
-  .refine((value) => value.role === 'admin' || value.researchIds.length > 0, {
-    message: 'Pilih minimal satu riset yang diwakili Pengaju.',
+  .refine((value) => value.role === 'admin' || value.researchIds.length === 1, {
+    message: 'Pilih tepat satu riset yang diwakili Pengaju.',
     path: ['researchIds'],
   });
 export const userSchema = z.object({
@@ -121,6 +121,7 @@ export const rabDocumentSchema = z.object({
   version: z.number().int().positive(),
   active: z.boolean(),
   source: attachmentSchema,
+  sourceKind: z.enum(['upload', 'demo']).default('upload'),
   createdAt: z.iso.datetime(),
   createdBy: z.string(),
   items: z.array(rabItemSchema).min(1).max(1000),
@@ -134,7 +135,7 @@ export type RabItemInput = z.infer<typeof rabItemInputSchema>;
 export const requestInputSchema = z.object({
   item: z.string().trim().min(1, 'Nama barang wajib diisi.'),
   unit: z.string().trim().min(1, 'Satuan wajib diisi.'),
-  researchId: z.string().min(1, 'Pilih jenis riset.'),
+  researchId: z.string().min(1, 'Riset perwakilan belum tersedia. Hubungi Admin.'),
   quantity: z.number().int('Jumlah harus bilangan bulat.').min(1, 'Jumlah minimal satu.'),
   unitPrice: positiveMoneySchema,
   requiredDate: z.iso.date('Tanggal tidak valid.'),
@@ -179,6 +180,7 @@ const notificationSchema = z.object({
 export const snapshotSchema = z
   .object({
     version: z.literal(1),
+    demoRevision: z.number().int().nonnegative().default(0),
     accountId: z.enum(['demo-admin', 'demo-pengaju']).nullable(),
     adminNoticeSeen: z.boolean().default(false),
     users: z.array(userSchema),

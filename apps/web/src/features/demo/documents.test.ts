@@ -257,7 +257,7 @@ describe('dokumen dan cakupan peran', () => {
     admin();
     const second = await importRab({ ...rab(), items: [{ ...item, name: 'Versi kedua' }] });
     expect(visibleRab(first).active).toBe(false);
-    expect(visibleRab(second).version).toBe(2);
+    expect(visibleRab(second).version).toBe(3);
     expect(getSnapshot().research.find((item) => item.id === 'smart')?.allocated).toBe(allocation);
     logoutDemo();
     loginDemo('pengaju@gmail.com', 'pengaju123');

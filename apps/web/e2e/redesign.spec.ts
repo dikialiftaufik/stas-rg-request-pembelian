@@ -150,6 +150,7 @@ test('seluruh header tabel mengurutkan, memperbarui URL dan mereset halaman', as
 test('menu aksi mendukung keyboard, pengembalian fokus dan klik luar', async ({ page }) => {
   await signIn(page);
   await page.goto('/users');
+  await page.getByRole('searchbox', { name: 'Cari pengguna' }).fill('Citra');
   const trigger = page.getByRole('button', { name: 'Aksi Ir. Citra Dewi', exact: true });
   await trigger.focus();
   await page.keyboard.press('Enter');
@@ -164,8 +165,8 @@ test('menu aksi mendukung keyboard, pengembalian fokus dan klik luar', async ({ 
   await trigger.click();
   await page.mouse.click(260, 90);
   await expect(page.getByRole('menu')).toHaveCount(0);
-  await page.getByRole('link', { name: 'Lihat semua perwakilan riset Ir. Citra Dewi' }).click();
-  await expect(page.getByRole('main').locator('ul li')).toHaveCount(6);
+  await page.getByRole('link', { name: 'Ir. Citra Dewi', exact: true }).click();
+  await expect(page.getByRole('main').locator('ul li')).toHaveCount(1);
   await page.keyboard.press('Escape');
   const logout = page.getByRole('button', { name: 'Keluar', exact: true });
   await logout.hover();
@@ -190,7 +191,7 @@ test('ekspor seluruh hasil lintas pagination mengikuti filter dan urutan aktif',
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(new Uint8Array(Buffer.concat(chunks)).buffer);
   const sheet = workbook.getWorksheet('Pembelian Barang');
-  expect(sheet?.rowCount).toBe(19);
+  expect(sheet?.rowCount).toBe(15);
   const names: string[] = [];
   sheet?.eachRow((row, index) => {
     if (index > 1) names.push(row.getCell(1).text);

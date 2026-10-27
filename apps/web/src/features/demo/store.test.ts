@@ -107,7 +107,7 @@ describe('cakupan peran dan request', () => {
     const user = currentUser();
     if (!user) throw new Error('Akun tidak tersedia');
     const summary = dashboardSummary(getSnapshot(), user);
-    expect([summary.total, summary.approved, summary.pending]).toEqual([24, 18, 4]);
+    expect([summary.total, summary.approved, summary.pending]).toEqual([24, 14, 4]);
     expect(summary.value.toString()).toBe('125400000');
   });
   it('membatasi pembacaan Pengaju dan menolak akses detail pengguna lain', () => {
@@ -188,7 +188,7 @@ describe('pengguna, riset, dan notifikasi', () => {
     expect(() => deleteUser('demo-admin')).toThrow(/utama/);
     expect(() => deleteUser('demo-pengaju')).toThrow(/utama/);
     expect(() => deleteUser('hasan')).toThrow(/dirujuk/);
-    expect(() => deleteResearch('smart')).toThrow(/dirujuk/);
+    expect(() => deleteResearch('smart')).toThrow(/RAB/);
     const user = currentUser();
     if (!user) throw new Error('Akun tidak tersedia');
     expect(() => saveUser({ ...user, email: 'other@gmail.com' }, user.id)).toThrow(

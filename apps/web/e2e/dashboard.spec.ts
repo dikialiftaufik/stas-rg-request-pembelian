@@ -35,7 +35,7 @@ test('dashboard Admin sesuai ringkasan dan bertahan setelah refresh', async ({ p
   await expect(page.getByRole('article', { name: 'Total Request', exact: true })).toContainText(
     '24',
   );
-  await expect(page.getByRole('article', { name: 'Disetujui', exact: true })).toContainText('18');
+  await expect(page.getByRole('article', { name: 'Disetujui', exact: true })).toContainText('14');
   await expect(page.getByRole('article', { name: 'Menunggu', exact: true })).toContainText('4');
   await expect(page.getByRole('article', { name: 'Total Nilai', exact: true })).toContainText(
     'Rp 125,4 Jt',
@@ -184,7 +184,8 @@ test('CRUD pengguna dan riset menjaga referensi serta akun utama', async ({ page
   await page.getByLabel('Nama lengkap', { exact: true }).fill('Pengguna Uji');
   await page.getByLabel('NIP/NIM', { exact: true }).fill('UJI-123');
   await page.getByLabel('Email', { exact: true }).fill('uji@example.test');
-  await page.getByLabel('Riset Otomasi Uji', { exact: true }).check();
+  await page.getByLabel('Perwakilan riset', { exact: true }).click();
+  await page.getByRole('option', { name: 'Riset Otomasi Uji', exact: true }).click();
   await page.getByRole('button', { name: 'Simpan', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Pengguna Uji', level: 1 })).toBeVisible();

@@ -1,4 +1,6 @@
-import type { DemoSnapshot } from './model';
+import { formatInTimeZone } from 'date-fns-tz';
+import type { DemoSnapshot, RequestStatus } from './model';
+import { createDemoRabs } from './demo-rab';
 
 // Public demonstration accounts, never production credentials.
 export const demoAccounts = [
@@ -6,7 +8,13 @@ export const demoAccounts = [
   { id: 'demo-pengaju', email: 'pengaju@gmail.com', password: 'pengaju123', role: 'pengaju' },
 ] as const;
 
-export function createSeed(): DemoSnapshot {
+export function createSeed(now = new Date()): DemoSnapshot {
+  const today = formatInTimeZone(now, 'Asia/Jakarta', 'yyyy-MM-dd');
+  function day(offset: number) {
+    const value = new Date(`${today}T12:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + offset);
+    return value.toISOString().slice(0, 10);
+  }
   const research = [
     ['smart', 'Smart Mannequin', '75000000'],
     ['automation', 'Automation Weapon Rack', '62000000'],
@@ -37,7 +45,7 @@ export function createSeed(): DemoSnapshot {
       identifier: '19880412001',
       email: 'pengaju@gmail.com',
       role: 'pengaju',
-      researchIds: research.map((item) => item.id),
+      researchIds: ['smart'],
       createdAt,
     },
     {
@@ -64,7 +72,7 @@ export function createSeed(): DemoSnapshot {
       identifier: '607012400005',
       email: 'budi@example.test',
       role: 'pengaju',
-      researchIds: ['smart'],
+      researchIds: ['weather'],
       createdAt,
     },
     {
@@ -74,6 +82,15 @@ export function createSeed(): DemoSnapshot {
       email: 'siti@example.test',
       role: 'pengaju',
       researchIds: ['automation'],
+      createdAt,
+    },
+    {
+      id: 'eka',
+      name: 'Eka Pratama',
+      identifier: '607012400006',
+      email: 'eka@example.test',
+      role: 'pengaju',
+      researchIds: ['farming'],
       createdAt,
     },
   ];
@@ -104,31 +121,85 @@ export function createSeed(): DemoSnapshot {
     'Perangkat Uji',
   ];
   const prices = ['12500000', '8900000', '3200000', '7500000', '1800000'];
-  const owners = ['demo-pengaju', 'hasan', 'budi', 'siti', 'demo-pengaju', 'ahmadi'];
-  const requests: DemoSnapshot['requests'] = items.map((item, index) => ({
-    id: `request-${index + 1}`,
-    item,
-    ownerId: owners[index % owners.length] ?? 'demo-pengaju',
-    researchId: research[index % research.length]?.id ?? 'smart',
-    quantity: 1,
-    unit: 'unit',
-    invoice: null,
-    fulfillment: null,
-    rabDocumentId: null,
-    rabItemId: null,
-    unitPrice: prices.at(index) ?? (index === 23 ? '10500000' : '4500000'),
-    status: [0, 4, 5, 6].includes(index)
+  const researchIds = [
+    'smart',
+    'automation',
+    'malware',
+    'weather',
+    'lake',
+    'farming',
+    'smart',
+    'automation',
+    'malware',
+    'weather',
+    'smart',
+    'smart',
+    'smart',
+    'automation',
+    'lake',
+    'farming',
+    'smart',
+    'malware',
+    'smart',
+    'automation',
+    'lake',
+    'farming',
+    'smart',
+    'weather',
+  ];
+  const deadlines = [
+    -2, 3, 5, 12, -5, 1, 0, 6, 16, 2, 6, 14, -3, 10, 4, 18, -11, -4, -1, 21, 3, 7, 25, 30,
+  ];
+  const stages: RequestStatus[] = [
+    'pending_review',
+    'approved',
+    'ordered',
+    'in_transit',
+    'delivered',
+    'completed',
+  ];
+  const requests: DemoSnapshot['requests'] = items.map((item, index) => {
+    const researchId = researchIds.at(index) ?? 'smart';
+    const status: RequestStatus = [0, 4, 5, 6].includes(index)
       ? 'pending_review'
-      : [1, 7].includes(index)
+      : [1, 7, 11].includes(index)
         ? 'ordered'
-        : 'approved',
-    requiredDate: '2026-11-12',
-    url: '',
-    notes: 'Data contoh untuk demonstrasi frontend.',
-    deleted: false,
-    statusHistory: [],
-    createdAt: new Date(Date.UTC(2026, 9, 26 - index, 8)).toISOString(),
-  }));
+        : index === 10
+          ? 'in_transit'
+          : index === 12
+            ? 'delivered'
+            : index === 16
+              ? 'delivered'
+              : 'approved';
+    const submitted = -(7 + index * 2);
+    const stageIndex = stages.indexOf(status);
+    return {
+      id: `request-${index + 1}`,
+      item,
+      ownerId: users.find((user) => user.researchIds.includes(researchId))?.id ?? 'demo-pengaju',
+      researchId,
+      quantity: 1,
+      unit: 'unit',
+      invoice: null,
+      fulfillment: null,
+      rabDocumentId: null,
+      rabItemId: null,
+      unitPrice: prices.at(index) ?? (index === 23 ? '10500000' : '4500000'),
+      status,
+      requiredDate: day(deadlines.at(index) ?? 14),
+      url: '',
+      notes: 'Data contoh untuk demonstrasi frontend.',
+      deleted: false,
+      statusHistory: stages.slice(1, stageIndex + 1).map((to, step) => ({
+        from: stages.at(step) ?? 'pending_review',
+        to,
+        actorId: 'demo-admin',
+        reason: 'Riwayat contoh demonstrasi.',
+        at: `${day(to === 'delivered' ? (index === 12 ? -4 : -12) : to === 'completed' ? -10 : submitted + 3 + step * 2)}T08:00:00.000Z`,
+      })),
+      createdAt: `${day(submitted)}T08:00:00.000Z`,
+    };
+  });
   const notifications: DemoSnapshot['notifications'] = [
     {
       id: 'notice-1',
@@ -165,20 +236,21 @@ export function createSeed(): DemoSnapshot {
     {
       id: 'notice-5',
       recipientId: 'demo-pengaju',
-      requestId: 'request-5',
-      message: 'Pengajuan pH Meter Digital menunggu persetujuan.',
+      requestId: 'request-7',
+      message: 'Pengajuan Modul Akuisisi Data menunggu persetujuan.',
       read: false,
       createdAt,
     },
   ];
   return {
     version: 1,
+    demoRevision: 1,
     accountId: null,
     adminNoticeSeen: false,
     users,
     research,
     requests,
     notifications,
-    rabDocuments: [],
+    rabDocuments: createDemoRabs(research, `${day(-14)}T08:00:00.000Z`),
   };
 }

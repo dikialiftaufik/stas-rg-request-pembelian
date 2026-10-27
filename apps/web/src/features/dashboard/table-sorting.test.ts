@@ -21,7 +21,7 @@ describe('sorting sesuai jenis data', () => {
   }));
   const cases: [RequestSortKey, string[]][] = [
     ['item', ['request-3', 'request-2', 'request-1']],
-    ['owner', ['request-3', 'request-2', 'request-1']],
+    ['owner', ['request-3', 'request-1', 'request-2']],
     ['research', ['request-2', 'request-3', 'request-1']],
     ['quantity', ['request-3', 'request-1', 'request-2']],
     ['total', ['request-2', 'request-3', 'request-1']],

@@ -39,7 +39,7 @@ test('periode tren, nama bulan dan peta urgensi memakai data serta URL independe
   await choose(page, page.getByLabel('Riset peta urgensi'), 'smart');
   await page.getByText(/^Lihat daftar prioritas/).click();
   const priority = page.getByRole('table', { name: /Urutan tanggal terdekat/ });
-  await expect(priority.locator('tbody tr')).toHaveCount(4);
+  await expect(priority.locator('tbody tr')).toHaveCount(6);
   await priority.getByRole('link', { name: 'Oscilloscope Digital', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Oscilloscope Digital' })).toBeVisible();
   expect(errors).toEqual([]);
@@ -85,7 +85,7 @@ test('halaman form menjaga perubahan dan mengembalikan konteks daftar', async ({
   await expect(page.getByRole('heading', { level: 1, name: item })).toBeVisible();
   await page.getByRole('link', { name: 'Kembali ke Pembelian Barang', exact: true }).click();
   await expect(page).toHaveURL('/requests?status=approved&page=2&sortBy=item&sortDir=asc');
-  await expect(page.getByText('Halaman 2 dari 4', { exact: true })).toBeVisible();
+  await expect(page.getByText('Halaman 2 dari 3', { exact: true })).toBeVisible();
   await page.goto('/requests?create=1&sourceRab=missing&sourceItem=missing&q=sensor');
   await expect(page.getByRole('heading', { name: 'Akses ditolak', level: 1 })).toBeVisible();
 });

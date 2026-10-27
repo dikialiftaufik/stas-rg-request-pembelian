@@ -128,7 +128,7 @@ test('impor CSV, koreksi, versi dan pengajuan dari RAB saling terhubung', async 
   });
   await page.getByRole('button', { name: 'Tinjau barang' }).click();
   await page.getByRole('button', { name: 'Konfirmasi impor' }).click();
-  await expect(page.getByText(/Versi 2/)).toBeVisible();
+  await expect(page.getByText(/Versi 3/)).toBeVisible();
   await page.getByRole('button', { name: 'Keluar', exact: true }).click();
   await signIn(page, 'pengaju');
   await page.goto('/requests?tab=rab');
@@ -167,7 +167,8 @@ test('XLSX multi-sheet mempertahankan angka numerik dan pembatalan tidak menyimp
   await page.getByRole('button', { name: 'Batal impor' }).click();
   await page.getByRole('button', { name: 'Tinggalkan perubahan', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByText('Belum ada RAB yang sesuai.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Lihat barang', exact: true })).toHaveCount(6);
+  await expect(page.getByRole('heading', { name: 'buku', exact: true })).toHaveCount(0);
 });
 
 test('periode URL dan Excel memakai seluruh hasil filter', async ({ page }) => {
@@ -175,10 +176,10 @@ test('periode URL dan Excel memakai seluruh hasil filter', async ({ page }) => {
   expect(await page.locator('link[rel="icon"]').getAttribute('href')).toContain('logo-stas-rg');
   await page.goto('/requests?page=3');
   await page.getByRole('button', { name: 'Rentang tanggal pengajuan: Semua tanggal' }).click();
-  await page.getByLabel('Dari tanggal', { exact: true }).fill('2026-10-01');
-  await page.getByLabel('Sampai tanggal', { exact: true }).fill('2026-10-31');
+  await page.getByLabel('Dari tanggal', { exact: true }).fill('2000-01-01');
+  await page.getByLabel('Sampai tanggal', { exact: true }).fill('2099-12-31');
   await page.getByRole('button', { name: 'Terapkan' }).click();
-  await expect(page).toHaveURL(/from=2026-10-01/);
+  await expect(page).toHaveURL(/from=2000-01-01/);
   await expect(page).not.toHaveURL(/page=3/);
   await page.getByRole('button', { name: 'Urutkan Total menaik' }).click();
   const download = page.waitForEvent('download');
@@ -187,7 +188,7 @@ test('periode URL dan Excel memakai seluruh hasil filter', async ({ page }) => {
   if (!path) throw new Error('Excel tidak tersedia');
   const book = new ExcelJS.Workbook();
   await book.xlsx.readFile(path);
-  expect(book.getWorksheet('Informasi ekspor')?.getCell('B2').value).toBe('2026-10-01');
+  expect(book.getWorksheet('Informasi ekspor')?.getCell('B2').value).toBe('2000-01-01');
   expect(book.getWorksheet('Pembelian Barang')?.rowCount).toBe(25);
   expect(book.getWorksheet('Pembelian Barang')?.getCell('J1').value).toBe('File invoice');
 });
