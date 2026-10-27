@@ -8,6 +8,8 @@ import {
   validateRequestDate,
   statusSchema,
   statusLabelMap,
+  invoiceSchema,
+  invoiceInputSchema,
 } from './model';
 import type {
   DemoSnapshot,
@@ -16,9 +18,12 @@ import type {
   UserInput,
   ResearchInput,
   RequestStatus,
+  AttachmentRef,
 } from './model';
 import { createSeed, demoAccounts } from './seed';
 import { allowedNextStatuses } from './request-workflow';
+import { getAttachment, putAttachment, removeAttachment } from './attachment-db';
+import { validateFile } from './file-validation';
 
 export const DEMO_STORAGE_KEY = 'stas-rg-demo-v1';
 let snapshot: DemoSnapshot | undefined;
@@ -36,7 +41,16 @@ export function getSnapshot(): DemoSnapshot {
   return snapshot;
 }
 
-function publish(next: DemoSnapshot) {
+function publish(next: DemoSnapshot, strict = false) {
+  if (strict) {
+    try {
+      sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(snapshotSchema.parse(next)));
+    } catch {
+      throw new Error(
+        'Data gagal disimpan. Periksa ruang dan izin penyimpanan browser lalu coba lagi.',
+      );
+    }
+  }
   snapshot = next;
   try {
     sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(next));
@@ -310,7 +324,22 @@ export async function changeRequestStatus(input: {
   reason?: string;
 }) {
   const user = requireUser(true);
-  const request = visibleRequest(input.id);
+  let request = visibleRequest(input.id);
+  if (input.nextStatus === 'completed') {
+    if (
+      !request.invoice ||
+      !invoiceSchema.safeParse(request.invoice).success ||
+      !invoiceInputSchema.safeParse(request.invoice).success
+    )
+      throw new Error('Lengkapi invoice sebelum menyelesaikan Pembelian Barang.');
+    const invoiceVersion = request.invoice.updatedAt;
+    if (request.invoice.file) await getAttachment(request.invoice.file);
+    request = visibleRequest(input.id);
+    if (request.invoice?.updatedAt !== invoiceVersion)
+      throw new Error('Invoice berubah. Periksa invoice terbaru sebelum menyelesaikan request.');
+    if (requireUser(true).id !== user.id)
+      throw new Error('Sesi berubah. Buka kembali request untuk melanjutkan.');
+  }
   const nextStatus = statusSchema.parse(input.nextStatus);
   if (request.status !== input.expectedStatus)
     throw new Error(
@@ -318,6 +347,8 @@ export async function changeRequestStatus(input: {
     );
   if (!allowedNextStatuses(request.status).includes(nextStatus))
     throw new Error('Perubahan status tidak diizinkan. Pilih tahapan berikutnya yang tersedia.');
+  if (input.nextStatus === 'completed' && !request.invoice)
+    throw new Error('Lengkapi invoice sebelum menyelesaikan Pembelian Barang.');
   const reason = input.reason?.trim() ?? '';
   if (nextStatus === 'rejected' && !reason)
     throw new Error('Jelaskan alasan penolakan agar Pengaju dapat menindaklanjuti.');
@@ -354,8 +385,83 @@ export async function changeRequestStatus(input: {
     ),
   );
 }
-
 export function consumeAdminNotice() {
   requireUser(true);
   if (!getSnapshot().adminNoticeSeen) publish({ ...getSnapshot(), adminNoticeSeen: true });
+}
+
+export function canManageInvoice(status: RequestStatus) {
+  return ['approved', 'ordered', 'in_transit', 'delivered', 'completed'].includes(status);
+}
+
+export async function loadInvoiceFile(requestId: string) {
+  const request = visibleRequest(requestId);
+  if (!request.invoice?.file) throw new Error('Invoice belum memiliki file.');
+  const blob = await getAttachment(request.invoice.file);
+  visibleRequest(requestId);
+  return blob;
+}
+
+export async function saveInvoice(input: {
+  requestId: string;
+  file?: File | undefined;
+  url: string;
+  expectedUpdatedAt: string | null;
+  amount: string;
+  invoiceDate: string;
+}) {
+  const actor = requireUser(true);
+  const original = visibleRequest(input.requestId);
+  if (!canManageInvoice(original.status))
+    throw new Error('Invoice dapat ditambahkan setelah request disetujui.');
+  const metadata = invoiceInputSchema.safeParse(input);
+  if (!metadata.success)
+    throw new Error(metadata.error.issues[0]?.message ?? 'Lengkapi nominal dan tanggal invoice.');
+  let stored: AttachmentRef | null = null;
+  try {
+    if (input.file)
+      stored = await putAttachment(input.file, await validateFile(input.file, 'invoice'), actor.id);
+    const user = requireUser(true);
+    const request = visibleRequest(input.requestId);
+    if (user.id !== actor.id || !canManageInvoice(request.status))
+      throw new Error('Sesi atau status berubah. Buka kembali request.');
+    if ((request.invoice?.updatedAt ?? null) !== input.expectedUpdatedAt)
+      throw new Error('Invoice sudah berubah. Buka kembali dokumen terbaru.');
+    const parsedInvoice = invoiceSchema.safeParse({
+      ...metadata.data,
+      file: stored ?? request.invoice?.file ?? null,
+      url: input.url,
+      updatedAt: new Date(
+        Math.max(Date.now(), request.invoice ? Date.parse(request.invoice.updatedAt) + 1 : 0),
+      ).toISOString(),
+      updatedBy: user.id,
+    });
+    if (!parsedInvoice.success)
+      throw new Error(
+        parsedInvoice.error.issues[0]?.message ?? 'Periksa file atau tautan invoice.',
+      );
+    const invoice = parsedInvoice.data;
+    const data = getSnapshot();
+    publish(
+      notification(
+        {
+          ...data,
+          requests: data.requests.map((item) =>
+            item.id === request.id ? { ...item, invoice } : item,
+          ),
+        },
+        request.ownerId,
+        request.id,
+        `Invoice ${request.item} tersedia untuk dilihat.`,
+      ),
+      true,
+    );
+    if (stored && request.invoice?.file)
+      void removeAttachment(request.invoice.file).catch(() => {
+        /* A failed cleanup must not undo a committed invoice. */
+      });
+  } catch (cause) {
+    if (stored) await removeAttachment(stored).catch(() => undefined);
+    throw cause;
+  }
 }

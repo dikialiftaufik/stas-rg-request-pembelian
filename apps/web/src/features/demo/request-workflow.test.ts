@@ -9,6 +9,7 @@ import {
   DEMO_STORAGE_KEY,
   consumeAdminNotice,
   logoutDemo,
+  saveInvoice,
 } from './store';
 import { allowedNextStatuses } from './request-workflow';
 import { researchUsed } from './model';
@@ -25,6 +26,14 @@ describe('alur status pembelian', () => {
       'completed',
     ] as const) {
       const before = visibleRequest('request-1');
+      if (nextStatus === 'completed')
+        await saveInvoice({
+          amount: '100000',
+          invoiceDate: '2026-01-01',
+          requestId: before.id,
+          url: 'https://example.test/invoice',
+          expectedUpdatedAt: null,
+        });
       await changeRequestStatus({
         id: before.id,
         expectedStatus: before.status,
