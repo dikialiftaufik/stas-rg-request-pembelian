@@ -42,6 +42,7 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
       url: invoice?.url ?? '',
     },
   });
+  const [expectedRevision, setExpectedRevision] = useState(request.revision);
   const [expected, setExpected] = useState(invoice?.updatedAt ?? null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,7 +79,13 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
     setBusy(true);
 
     try {
-      await saveInvoice({ requestId: request.id, file, ...values, expectedUpdatedAt: expected });
+      await saveInvoice({
+        requestId: request.id,
+        file,
+        ...values,
+        expectedUpdatedAt: expected,
+        expectedRevision,
+      });
       markSaved();
       toast.success('Invoice berhasil disimpan.');
       setEditing(false);
@@ -96,6 +103,18 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
   return (
     <section aria-label={`Invoice ${request.item}`}>
       <h3 className={styles.sectionTitle}>{request.item}</h3>
+      {invoice &&
+        request.replacements.some(
+          (proposal) =>
+            proposal.status === 'accepted' &&
+            proposal.respondedAt &&
+            proposal.respondedAt > invoice.updatedAt,
+        ) && (
+          <p role="status" className={styles.hint}>
+            Penawaran berubah setelah invoice disimpan. Admin perlu memeriksa kesesuaian dokumen;
+            nominal invoice tetap mengikuti dokumen asli.
+          </p>
+        )}
       {invoice && (
         <>
           <dl className={styles.detailGrid}>
@@ -153,7 +172,12 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
             </p>
           )}
           {invoice.file && preview.fileId === invoice.file.id && preview.blob && (
-            <FilePreview key={invoice.file.id} blob={preview.blob} name={invoice.file.name} />
+            <FilePreview
+              key={invoice.file.id}
+              blob={preview.blob}
+              name={invoice.file.name}
+              downloadLabel="Unduh invoice"
+            />
           )}
           {invoice.url && (
             <p>
@@ -175,6 +199,7 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
           onClick={() => {
             resetSaved();
             setExpected(invoice?.updatedAt ?? null);
+            setExpectedRevision(request.revision);
             setConfirmed(false);
             setEditing(true);
           }}
@@ -230,12 +255,12 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
             <Field
               id="invoice-file"
               label={invoice ? 'File pengganti (opsional)' : 'File invoice'}
-              hint="PDF, PNG, JPEG, atau WebP. Maksimal 10 MB."
+              hint="PDF, XLSX, DOCX, PNG, JPEG, atau WebP. Maksimal 10 MB."
             >
               <input
                 id="invoice-file"
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.webp"
+                accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg,.webp"
                 disabled={busy}
                 onInput={(event) => setFile(event.currentTarget.files?.[0])}
               />

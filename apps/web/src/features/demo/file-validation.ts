@@ -7,6 +7,10 @@ export async function validateFile(file: File, purpose: 'invoice' | 'rab') {
   const bytes = new Uint8Array(await fileBytes(file.slice(0, 1024)));
   const header = new TextDecoder().decode(bytes);
   let mime = '';
+  if (purpose === 'invoice' && (ext === 'xlsx' || ext === 'docx')) {
+    const { validateOffice } = await import('./office-validation');
+    return validateOffice(file, ext);
+  }
   if (ext === 'pdf' && header.startsWith('%PDF-')) mime = 'application/pdf';
   if (purpose === 'invoice') {
     if (ext === 'png' && bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71)
@@ -28,7 +32,7 @@ export async function validateFile(file: File, purpose: 'invoice' | 'rab') {
   if (!mime)
     throw new Error(
       purpose === 'invoice'
-        ? 'Gunakan file PDF, PNG, JPEG, atau WebP yang valid.'
+        ? 'Gunakan file PDF, XLSX, DOCX, PNG, JPEG, atau WebP yang valid.'
         : 'Gunakan file CSV, XLSX, atau PDF yang valid.',
     );
   if (mime === 'application/pdf') {

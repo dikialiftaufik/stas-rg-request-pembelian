@@ -2,7 +2,15 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { ArrowDownTrayIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import styles from './dashboard.module.css';
 const PdfPreview = lazy(() => import('./pdf-preview'));
-export function FilePreview({ blob, name }: { blob: Blob; name: string }) {
+export function FilePreview({
+  blob,
+  name,
+  downloadLabel,
+}: {
+  blob: Blob;
+  name: string;
+  downloadLabel?: string;
+}) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     const value = URL.createObjectURL(blob);
@@ -21,10 +29,10 @@ export function FilePreview({ blob, name }: { blob: Blob; name: string }) {
             className={styles.secondaryButton}
             href={url}
             download={name}
-            aria-label={`Unduh ${name}`}
+            aria-label={downloadLabel ?? `Unduh ${name}`}
           >
             <ArrowDownTrayIcon aria-hidden="true" />
-            Unduh file
+            {downloadLabel ?? 'Unduh file'}
           </a>
         </div>
       )}
@@ -35,7 +43,11 @@ export function FilePreview({ blob, name }: { blob: Blob; name: string }) {
       ) : blob.type.startsWith('image/') && url ? (
         <img src={url} alt={`Pratinjau ${name}`} width={640} height={480} />
       ) : (
-        <p className={styles.hint}>Daftar barang dari dokumen ini tersedia pada tabel di bawah.</p>
+        <p className={styles.hint}>
+          {blob.type.includes('openxmlformats') && downloadLabel
+            ? 'Pratinjau dokumen Office tersedia melalui aplikasi dokumen. Unduh invoice untuk membukanya.'
+            : 'Daftar barang dari dokumen ini tersedia pada tabel di bawah.'}
+        </p>
       )}
     </div>
   );
