@@ -1,3 +1,4 @@
+import { ReplacementPage } from './features/dashboard/replacement';
 import logoUrl from '../../../assets/img/logo-stas-rg.png';
 import { Link, Outlet, Route, Routes, Navigate, useLocation } from 'react-router';
 import { Button } from './components/ui/button';
@@ -72,6 +73,13 @@ function WorkspaceLayout() {
   );
 }
 
+function DeliveryRedirect() {
+  const location = useLocation();
+  return (
+    <Navigate replace to={`${location.pathname.replace(/\/delivery$/, '')}${location.search}`} />
+  );
+}
+
 export function App() {
   const location = useLocation();
   const legacy = legacyDestination(location.pathname, location.search);
@@ -93,11 +101,9 @@ export function App() {
             element={<RequestRecordPage mode="invoice" />}
           />
           <Route path="/requests/:requestId/edit" element={<RequestRecordPage mode="edit" />} />
+          <Route path="/requests/:requestId/replacement" element={<ReplacementPage />} />
           <Route path="/requests/:requestId/status" element={<RequestRecordPage mode="status" />} />
-          <Route
-            path="/requests/:requestId/delivery"
-            element={<RequestRecordPage mode="delivery" />}
-          />
+          <Route path="/requests/:requestId/delivery" element={<DeliveryRedirect />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route element={<AdminGate />}>

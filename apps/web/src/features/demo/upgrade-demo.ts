@@ -41,6 +41,8 @@ export function upgradeDemo(data: DemoSnapshot): DemoSnapshot {
       request.researchId === researchId &&
       request.status === originalStatus &&
       request.submissionStatus === 'not_submitted' &&
+      !request.replacements.length &&
+      request.revision === 0 &&
       request.unitPrice === (originalPrices.at(index) ?? (index === 23 ? '10500000' : '4500000')) &&
       request.quantity === 1 &&
       request.unit === 'unit' &&

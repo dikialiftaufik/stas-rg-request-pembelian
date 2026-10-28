@@ -163,11 +163,11 @@ describe('cakupan peran dan request', () => {
     expect(() => visibleRequest(original.id)).toThrow();
     expect(getSnapshot().requests.find((item) => item.id === original.id)?.deleted).toBe(true);
   });
-  it('menolak pemakaian dana melebihi alokasi dan perubahan tidak diterapkan sebagian', () => {
+  it('menolak bypass penawaran pengganti dan alokasi tidak mencukupi', () => {
     admin();
     const request = visibleRequest('request-3');
     expect(() => saveRequest({ ...request, unitPrice: '9999999999' }, request.id)).toThrow(
-      /alokasi/,
+      /link pengganti/,
     );
     expect(visibleRequest(request.id).unitPrice).toBe(request.unitPrice);
     expect(() =>

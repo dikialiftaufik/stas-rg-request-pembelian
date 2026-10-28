@@ -1,40 +1,31 @@
-import { useState } from 'react';
+import { Fragment } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowRightStartOnRectangleIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import Decimal from 'decimal.js';
-import { FieldGroup } from '@/components/ui/field';
 import { useDemo } from '../demo/use-demo';
 import {
   canManageInvoice,
   markNotificationsRead,
-  saveFulfillment,
   scopedRequests,
+  replacementBlocked,
   visibleRab,
 } from '../demo/store';
-import {
-  formatDate,
-  formatMoney,
-  requestTotal,
-  statusLabelMap,
-  fulfillmentInputSchema,
-  researchUsed,
-} from '../demo/model';
-import type { DemoRequest, FulfillmentInput } from '../demo/model';
+import { formatDate, formatMoney, requestTotal, statusLabelMap, researchUsed } from '../demo/model';
+import type { DemoRequest } from '../demo/model';
 import { allowedNextStatuses } from '../demo/request-workflow';
 import { useDemoLogout } from '../auth/use-demo-logout';
 import { RequestEditor, ResearchEditor, UserEditor } from './editors';
 import { RequestStatusEditor } from './request-status-editor';
 import { InvoiceContent } from './invoice';
+import { ReplacementBranch } from './replacement';
 import { SubmissionStatusCell } from './submission-status';
 import { RabDetails } from './rab-list';
 import { RabImporter } from './rab-import';
-import { Field, StatusBadge } from './shared';
+import { StatusBadge } from './shared';
 import { RecordCard, RecordPage, UnavailablePage } from './record-page';
-import { useRecordNavigation, useUnsavedChanges, recordDestination } from './record-navigation';
-import { fieldAttributes } from './form-utils';
+import { useRecordNavigation, recordDestination } from './record-navigation';
 import styles from './dashboard.module.css';
 
 function AccessDenied() {
@@ -56,11 +47,12 @@ export function RequestTimeline({ request }: { request: DemoRequest }) {
     'completed',
   ] as const;
   const current = stages.findIndex((stage) => stage === request.status);
+  const replacement = request.replacements.at(-1);
   const terminal = request.status === 'rejected' || request.status === 'cancelled';
   const { data } = useDemo();
   return (
     <RecordCard
-      title="Perjalanan barang"
+      title="Proses pembelian"
       description="Tahapan diperbarui oleh Admin. Tanggal mengikuti riwayat yang tercatat."
     >
       <ol className={styles.fulfillmentTimeline}>
@@ -69,22 +61,37 @@ export function RequestTimeline({ request }: { request: DemoRequest }) {
           const at = stage === 'pending_review' ? request.createdAt : history?.at;
           const reached = terminal ? index === 0 : index <= current;
           return (
-            <li
-              key={stage}
-              data-reached={reached}
-              {...(stage === request.status ? { 'aria-current': 'step' as const } : {})}
-            >
-              <span className={styles.stageNumber} aria-hidden="true">
-                {reached && stage !== request.status ? <CheckIcon aria-hidden="true" /> : index + 1}
-              </span>
-              <strong>{statusLabelMap.get(stage)}</strong>
-              <span>
-                {reached ? (at ? formatDate(at) : 'Tanggal belum tercatat') : 'Belum berlangsung'}
-              </span>
-            </li>
+            <Fragment key={stage}>
+              <li
+                style={{ '--stage-column': index + 1 } as CSSProperties}
+                data-reached={reached}
+                {...(stage === request.status ? { 'aria-current': 'step' as const } : {})}
+              >
+                <span className={styles.stageNumber} aria-hidden="true">
+                  {reached && stage !== request.status ? (
+                    <CheckIcon aria-hidden="true" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <strong>{statusLabelMap.get(stage)}</strong>
+                <span>
+                  {reached ? (at ? formatDate(at) : 'Tanggal belum tercatat') : 'Belum berlangsung'}
+                </span>
+              </li>
+              {replacement?.originStatus === stage && (
+                <li
+                  className={styles.timelineBranch}
+                  style={{ '--stage-column': index + 1 } as CSSProperties}
+                >
+                  <ReplacementBranch request={request} />
+                </li>
+              )}
+            </Fragment>
           );
         })}
       </ol>
+      {!replacement && <ReplacementBranch request={request} />}
       {terminal && (
         <p className={styles.terminalNotice}>
           <StatusBadge status={request.status} />{' '}
@@ -120,126 +127,10 @@ export function RequestTimeline({ request }: { request: DemoRequest }) {
     </RecordCard>
   );
 }
-function DeliveryForm({ request, onSaved }: { request: DemoRequest; onSaved: () => void }) {
-  const { back } = useRecordNavigation(`/requests/${request.id}`);
-  const [expected] = useState(request.fulfillment?.updatedAt ?? null);
-  const {
-    register,
-    handleSubmit,
-    control,
-    setError,
-    formState: { errors, isDirty, isSubmitting },
-  } = useForm<FulfillmentInput>({
-    resolver: zodResolver(fulfillmentInputSchema),
-    defaultValues: request.fulfillment ?? {
-      supplier: '',
-      courier: '',
-      trackingNumber: '',
-      estimatedArrival: null,
-      notes: '',
-    },
-  });
-  const { guard, markSaved } = useUnsavedChanges(isDirty, isSubmitting);
-  const estimate = useWatch({ control, name: 'estimatedArrival' });
-  const submit = handleSubmit((values) => {
-    try {
-      saveFulfillment({ requestId: request.id, values, expectedUpdatedAt: expected });
-      markSaved();
-      toast.success('Informasi pengiriman berhasil disimpan.');
-      onSaved();
-    } catch (cause) {
-      setError('root', {
-        message: cause instanceof Error ? cause.message : 'Informasi gagal disimpan. Coba lagi.',
-      });
-    }
-  });
-  return (
-    <RecordPage
-      title="Informasi pengiriman"
-      back={back}
-      aside={
-        <RecordCard title={request.item}>
-          <StatusBadge status={request.status} />
-          <p>Tanggal kebutuhan: {formatDate(request.requiredDate)}</p>
-          <p className={styles.hint}>
-            Informasi ini diperbarui manual. Penyimpanan tidak mengubah status pembelian.
-          </p>
-        </RecordCard>
-      }
-    >
-      <RecordCard
-        title="Pemasok dan pengiriman"
-        description="Isi informasi yang tersedia; seluruh kolom bersifat opsional."
-      >
-        <form noValidate autoComplete="off" onSubmit={(event) => void submit(event)}>
-          <FieldGroup className={styles.formGrid}>
-            <Field id="delivery-supplier" label="Pemasok" error={errors.supplier?.message}>
-              <input
-                {...register('supplier')}
-                {...fieldAttributes('delivery-supplier', errors.supplier?.message)}
-              />
-            </Field>
-            <Field id="delivery-courier" label="Kurir" error={errors.courier?.message}>
-              <input
-                {...register('courier')}
-                {...fieldAttributes('delivery-courier', errors.courier?.message)}
-              />
-            </Field>
-            <Field id="delivery-tracking" label="Nomor resi" error={errors.trackingNumber?.message}>
-              <input
-                {...register('trackingNumber')}
-                {...fieldAttributes('delivery-tracking', errors.trackingNumber?.message)}
-              />
-            </Field>
-            <Field
-              id="delivery-date"
-              label="Estimasi tiba"
-              error={errors.estimatedArrival?.message}
-            >
-              <input
-                type="date"
-                {...register('estimatedArrival', { setValueAs: (value: string) => value || null })}
-                {...fieldAttributes('delivery-date', errors.estimatedArrival?.message)}
-              />
-            </Field>
-            <div className={styles.fullField}>
-              <Field id="delivery-notes" label="Catatan pengiriman" error={errors.notes?.message}>
-                <textarea
-                  {...register('notes')}
-                  {...fieldAttributes('delivery-notes', errors.notes?.message)}
-                />
-              </Field>
-            </div>
-            {estimate && estimate > request.requiredDate && (
-              <p className={styles.fullField} role="status">
-                Estimasi tiba melewati tanggal kebutuhan. Koordinasikan jadwal dengan Pengaju.
-              </p>
-            )}
-            {errors.root && (
-              <p className={styles.formError} role="alert">
-                {errors.root.message}
-              </p>
-            )}
-            <div className={`${styles.dialogActions} ${styles.fullField}`}>
-              <Link className={styles.secondaryButton} to={back}>
-                Batal
-              </Link>
-              <button className={styles.primaryButton} disabled={isSubmitting} type="submit">
-                Simpan pengiriman
-              </button>
-            </div>
-          </FieldGroup>
-        </form>
-        {guard}
-      </RecordCard>
-    </RecordPage>
-  );
-}
-
 export function RequestRecordPage({
   mode = 'view',
 }: {
-  mode?: 'view' | 'new' | 'edit' | 'status' | 'invoice' | 'delivery';
+  mode?: 'view' | 'new' | 'edit' | 'status' | 'invoice';
 }) {
   const { data, user } = useDemo();
   const { requestId } = useParams();
@@ -259,8 +150,15 @@ export function RequestRecordPage({
       <AccessDenied />
     );
   if (!request) return <UnavailablePage back={back} />;
-  if (['edit', 'status', 'delivery'].includes(mode) && user.role !== 'admin')
-    return <AccessDenied />;
+  if (['edit', 'status'].includes(mode) && user.role !== 'admin') return <AccessDenied />;
+  if (mode === 'edit' && replacementBlocked(request))
+    return (
+      <RecordPage title="Pembelian dijeda" back={back}>
+        <RecordCard title="Tuntaskan penawaran pengganti">
+          <ReplacementBranch request={request} />
+        </RecordCard>
+      </RecordPage>
+    );
   if (mode === 'edit')
     return <RequestEditor request={request} onClose={() => void navigate(back)} onSaved={saved} />;
   if (mode === 'invoice')
@@ -307,13 +205,6 @@ export function RequestRecordPage({
         </RecordCard>
       </RecordPage>
     );
-  if (mode === 'delivery')
-    return canManageInvoice(request.status) ? (
-      <DeliveryForm request={request} onSaved={() => saved(request.id)} />
-    ) : (
-      <UnavailablePage title="Pengiriman belum tersedia" back={back} />
-    );
-  const delivery = request.fulfillment;
   const owner = data.users.find((person) => person.id === request.ownerId);
   const research = data.research.find((item) => item.id === request.researchId);
   return (
@@ -347,11 +238,13 @@ export function RequestRecordPage({
                 <dd className={styles.pageTotal}>{formatMoney(requestTotal(request))}</dd>
               </div>
             </dl>
-            {user.role === 'admin' && allowedNextStatuses(request.status).length > 0 && (
-              <Link className={styles.primaryButton} to={link(`/requests/${request.id}/status`)}>
-                Ubah status
-              </Link>
-            )}
+            {user.role === 'admin' &&
+              !replacementBlocked(request) &&
+              allowedNextStatuses(request.status).length > 0 && (
+                <Link className={styles.primaryButton} to={link(`/requests/${request.id}/status`)}>
+                  Ubah status
+                </Link>
+              )}
           </RecordCard>
           <RecordCard title="Invoice">
             <p className={styles.invoiceNumber}>
@@ -418,33 +311,6 @@ export function RequestRecordPage({
         )}
       </RecordCard>
       <RequestTimeline request={request} />
-      <RecordCard title="Informasi pengiriman">
-        <dl className={styles.detailGrid}>
-          {[
-            ['Pemasok', delivery?.supplier],
-            ['Kurir', delivery?.courier],
-            ['Nomor resi', delivery?.trackingNumber],
-            [
-              'Estimasi tiba',
-              delivery?.estimatedArrival ? formatDate(delivery.estimatedArrival) : '',
-            ],
-            ['Catatan', delivery?.notes],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{value || 'Belum diisi'}</dd>
-            </div>
-          ))}
-        </dl>
-        {delivery?.estimatedArrival && delivery.estimatedArrival > request.requiredDate && (
-          <p className={styles.hint}>Estimasi tiba melewati tanggal kebutuhan.</p>
-        )}
-        {user.role === 'admin' && canManageInvoice(request.status) && (
-          <Link className={styles.secondaryButton} to={link(`/requests/${request.id}/delivery`)}>
-            {delivery ? 'Edit pengiriman' : 'Isi informasi pengiriman'}
-          </Link>
-        )}
-      </RecordCard>
     </RecordPage>
   );
 }

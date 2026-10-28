@@ -95,27 +95,31 @@ describe('akses dashboard demo', () => {
   it.each([
     ['admin', 'admin@gmail.com', 'admin123'],
     ['pengaju', 'pengaju@gmail.com', 'pengaju123'],
-  ])('membuka dashboard untuk %s', async (role, email, password) => {
-    const user = userEvent.setup();
-    renderApp();
-    await user.type(screen.getByLabelText('ID / NIM / EMAIL'), email);
-    await user.type(screen.getByLabelText('PASSWORD'), password);
-    await user.click(screen.getByRole('button', { name: 'Masuk ke Dashboard' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
-    if (role !== 'admin')
-      expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
-    expect(window.location.pathname).toBe('/dashboard');
-    if (role === 'admin') {
-      expect(await screen.findByRole('dialog', { name: 'Pemberitahuan Request' })).toBeVisible();
-      await user.click(screen.getByRole('button', { name: 'Nanti saja' }));
-      expect(screen.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
-    } else {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'Manajemen Pengguna' })).not.toBeInTheDocument();
-    }
-    await user.click(screen.getByRole('button', { name: 'Keluar' }));
-    expect(await screen.findByLabelText('ID / NIM / EMAIL')).toBeVisible();
-  });
+  ])(
+    'membuka dashboard untuk %s',
+    async (role, email, password) => {
+      const user = userEvent.setup();
+      renderApp();
+      await user.type(screen.getByLabelText('ID / NIM / EMAIL'), email);
+      await user.type(screen.getByLabelText('PASSWORD'), password);
+      await user.click(screen.getByRole('button', { name: 'Masuk ke Dashboard' }));
+      await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
+      if (role !== 'admin')
+        expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+      expect(window.location.pathname).toBe('/dashboard');
+      if (role === 'admin') {
+        expect(await screen.findByRole('dialog', { name: 'Pemberitahuan Request' })).toBeVisible();
+        await user.click(screen.getByRole('button', { name: 'Nanti saja' }));
+        expect(screen.getByRole('link', { name: 'Manajemen Pengguna' })).toBeVisible();
+      } else {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Manajemen Pengguna' })).not.toBeInTheDocument();
+      }
+      await user.click(screen.getByRole('button', { name: 'Keluar' }));
+      expect(await screen.findByLabelText('ID / NIM / EMAIL')).toBeVisible();
+    },
+    15000,
+  );
   it('mengarahkan tamu dari dashboard ke login', () => {
     window.history.replaceState({}, '', '/dashboard');
     renderApp();

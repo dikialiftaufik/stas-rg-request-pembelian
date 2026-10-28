@@ -42,11 +42,15 @@ describe('status pengajuan administratif', () => {
     loginDemo('admin@gmail.com', 'admin123');
     const before = visibleRequest(change.id);
     changeSubmissionStatus(change);
-    expect(visibleRequest(change.id)).toEqual({ ...before, submissionStatus: 'submitted' });
+    expect(visibleRequest(change.id)).toEqual({
+      ...before,
+      submissionStatus: 'submitted',
+      revision: before.revision + 1,
+    });
     reloadDemoState();
     expect(visibleRequest(change.id).submissionStatus).toBe('submitted');
     changeSubmissionStatus({ ...change, expectedStatus: 'submitted', nextStatus: 'not_submitted' });
-    expect(visibleRequest(change.id)).toEqual(before);
+    expect(visibleRequest(change.id)).toEqual({ ...before, revision: before.revision + 2 });
   });
   it('rejects unauthorized, stale, invalid and deleted requests without mutations', () => {
     const initial = JSON.stringify(getSnapshot());

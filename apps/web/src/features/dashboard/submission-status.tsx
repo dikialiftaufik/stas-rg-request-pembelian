@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,26 +17,34 @@ import styles from './dashboard.module.css';
 
 export function SubmissionStatusCell({ request }: { request: DemoRequest }) {
   const { user } = useDemo();
+  const [expectedRevision, setExpectedRevision] = useState(request.revision);
   const [expected, setExpected] = useState(request.submissionStatus);
-  const variant = request.submissionStatus === 'submitted' ? 'default' : 'outline';
+  const badgeStatus = request.submissionStatus === 'submitted' ? 'approved' : 'pending_review';
   const label = submissionStatusLabels[request.submissionStatus];
-  if (user?.role !== 'admin') return <Badge variant={variant}>{label}</Badge>;
+  if (user?.role !== 'admin')
+    return (
+      <Badge variant="secondary" className={styles.statusBadge} data-status={badgeStatus}>
+        {label}
+      </Badge>
+    );
   return (
     <DropdownMenu
       modal={false}
       onOpenChange={(open) => {
-        if (open) setExpected(request.submissionStatus);
+        if (open) {
+          setExpected(request.submissionStatus);
+          setExpectedRevision(request.revision);
+        }
       }}
     >
       <DropdownMenuTrigger asChild>
-        <Badge asChild variant={variant}>
+        <Badge asChild variant="secondary" className={styles.statusBadge} data-status={badgeStatus}>
           <button
             type="button"
             className={styles.submissionTrigger}
             aria-label={`Status pengajuan ${request.item}: ${label}`}
           >
             {label}
-            <ChevronDownIcon aria-hidden="true" />
           </button>
         </Badge>
       </DropdownMenuTrigger>
@@ -51,6 +58,7 @@ export function SubmissionStatusCell({ request }: { request: DemoRequest }) {
               changeSubmissionStatus({
                 id: request.id,
                 expectedStatus: expected,
+                expectedRevision,
                 nextStatus: submissionStatusSchema.parse(value),
               });
               toast.success(`Status pengajuan ${request.item} berhasil diperbarui.`);

@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router';
+import { useState } from 'react';
 import { FormSelect } from '@/components/ui/form-select';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { z } from 'zod';
@@ -69,6 +70,7 @@ export function RequestEditor({
   onSaved: (id: string) => void;
 }) {
   const { data, user } = useDemo();
+  const [expectedRevision] = useState(request?.revision);
   const limits = requestDateLimits();
   const [params] = useSearchParams();
   const documents = user ? scopedRabs(data, user).filter((doc) => doc.active) : [];
@@ -164,6 +166,7 @@ export function RequestEditor({
           !request && values.sourceMode === 'rab'
             ? { documentId: values.documentId, itemId: values.itemId }
             : undefined,
+          expectedRevision,
         );
         toast.success(request ? 'Request berhasil diperbarui.' : 'Request berhasil diajukan.');
         markSaved();
@@ -206,6 +209,18 @@ export function RequestEditor({
       }
     >
       <RecordCard title="Informasi barang">
+        {request && request.status !== 'pending_review' && (
+          <p className={styles.hint}>
+            Tautan dan harga tidak diubah langsung setelah persetujuan.{' '}
+            {['approved', 'ordered'].includes(request.status) ? (
+              <Link className={styles.textLink} to={`/requests/${request.id}/replacement`}>
+                Ajukan link pengganti untuk ditinjau Pengaju
+              </Link>
+            ) : (
+              'Pembelian sudah memasuki tahap pengiriman atau berakhir.'
+            )}
+          </p>
+        )}
         {!request && (!assigned || user?.researchIds.length !== 1) && (
           <p className={styles.formError} role="alert">
             Riset perwakilan belum valid. Minta Admin menetapkan tepat satu riset pada profil Anda
@@ -379,6 +394,7 @@ export function RequestEditor({
             <Field id="request-price" label="Harga satuan (Rp)" error={errors.unitPrice?.message}>
               <input
                 {...register('unitPrice')}
+                readOnly={!!request && request.status !== 'pending_review'}
                 {...fieldAttributes('request-price', errors.unitPrice?.message)}
                 inputMode="decimal"
                 placeholder="Contoh: 1250000"
@@ -407,6 +423,7 @@ export function RequestEditor({
             <Field id="request-url" label="URL barang (opsional)" error={errors.url?.message}>
               <input
                 {...register('url')}
+                readOnly={!!request && request.status !== 'pending_review'}
                 {...fieldAttributes('request-url', errors.url?.message)}
                 type="url"
                 placeholder="https://contoh.id/barang"

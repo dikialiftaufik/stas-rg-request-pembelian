@@ -1341,13 +1341,18 @@
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
-.submissionTrigger {
-  min-height: 34px;
-  padding: 5px 9px;
+.shell .submissionTrigger {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  min-height: 28px;
+  padding: 3px 7px;
   cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
 }
 @media (pointer: coarse) {
-  .submissionTrigger {
+  .shell .submissionTrigger {
     min-height: 44px;
   }
 }
@@ -1883,7 +1888,7 @@
   padding: 0;
   margin: 0 0 24px;
 }
-.fulfillmentTimeline li {
+.fulfillmentTimeline > li {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1893,7 +1898,7 @@
   color: var(--ui-muted);
   font-size: 0.75rem;
 }
-.fulfillmentTimeline li::before {
+.fulfillmentTimeline > li::before {
   content: '';
   position: absolute;
   left: 32px;
@@ -1902,7 +1907,7 @@
   height: 2px;
   background: var(--ui-border);
 }
-.fulfillmentTimeline li:last-child::before {
+.fulfillmentTimeline > li:last-child::before {
   display: none;
 }
 .fulfillmentTimeline strong {
@@ -2076,7 +2081,7 @@
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .fulfillmentTimeline li {
+  .fulfillmentTimeline > li {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
     column-gap: 12px;
@@ -2085,7 +2090,7 @@
   .stageNumber {
     grid-row: span 2;
   }
-  .fulfillmentTimeline li::before {
+  .fulfillmentTimeline > li::before {
     left: 15px;
     right: auto;
     top: 36px;
@@ -2147,5 +2152,127 @@
   .history summary {
     min-height: 44px;
     padding-block: 12px;
+  }
+}
+
+.tableHint {
+  padding: 10px 16px;
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: var(--ui-text-small);
+}
+.submissionTrigger:hover {
+  filter: brightness(0.96);
+}
+.replacementBranch {
+  margin: 20px 0 16px 16%;
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--ui-primary);
+  border-radius: var(--ui-radius);
+  background: var(--ui-canvas);
+  overflow-wrap: anywhere;
+}
+.replacementBranch h3 {
+  font-size: 1rem;
+  margin: 8px 0;
+}
+.replacementBranch p {
+  font-size: var(--ui-text-body);
+  line-height: 1.6;
+}
+.branchSteps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding-left: 20px;
+  font-size: var(--ui-text-label);
+}
+.branchSteps [aria-current] {
+  font-weight: 700;
+  color: var(--ui-primary);
+}
+@media (max-width: 767px) {
+  .replacementBranch {
+    margin-left: 20px;
+  }
+  .branchSteps {
+    display: grid;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell .submissionTrigger {
+    transition: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .replacementBranch[data-origin='ordered'] {
+    margin-left: 32%;
+  }
+}
+
+.fulfillmentTimeline > li {
+  grid-column: var(--stage-column);
+  grid-row: 1;
+}
+.fulfillmentTimeline > .timelineBranch {
+  grid-row: 2;
+  grid-column: var(--stage-column) / -1;
+  padding-top: 24px;
+  min-height: 0;
+}
+.fulfillmentTimeline > .timelineBranch::before {
+  display: none;
+}
+.timelineBranch .replacementBranch {
+  position: relative;
+  margin: 0;
+}
+.timelineBranch .replacementBranch::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 20px;
+  height: 24px;
+  border-left: 2px dashed var(--ui-border);
+}
+.branchSteps {
+  list-style: none;
+  counter-reset: branch;
+  padding: 0;
+}
+.branchSteps > li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  counter-increment: branch;
+}
+.branchSteps > li::before {
+  content: counter(branch);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ui-sage);
+  color: var(--ui-primary);
+  font-weight: 600;
+}
+@media (max-width: 767px) {
+  .fulfillmentTimeline > li {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .fulfillmentTimeline > .timelineBranch {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    grid-row: auto;
+    grid-column: 1;
+    margin-left: 20px;
+    padding-top: 0;
+    margin-bottom: 20px;
   }
 }

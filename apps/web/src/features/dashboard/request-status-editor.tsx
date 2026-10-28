@@ -4,7 +4,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { changeRequestStatus } from '../demo/store';
+import { changeRequestStatus, replacementBlocked } from '../demo/store';
 import { statusSchema, statusLabelMap } from '../demo/model';
 import type { DemoRequest } from '../demo/model';
 import { allowedNextStatuses } from '../demo/request-workflow';
@@ -31,8 +31,9 @@ export function RequestStatusEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const [expectedRevision] = useState(request.revision);
   const [expectedStatus] = useState(request.status);
-  const options = allowedNextStatuses(expectedStatus);
+  const options = replacementBlocked(request) ? [] : allowedNextStatuses(expectedStatus);
   const {
     register,
     handleSubmit,
@@ -47,7 +48,7 @@ export function RequestStatusEditor({
   const nextStatus = useWatch({ control, name: 'nextStatus' });
   const submit = handleSubmit(async (values) => {
     try {
-      await changeRequestStatus({ id: request.id, expectedStatus, ...values });
+      await changeRequestStatus({ id: request.id, expectedStatus, expectedRevision, ...values });
       toast.success(`Status ${request.item} berhasil diperbarui.`);
       markSaved();
       onSaved();
@@ -65,7 +66,13 @@ export function RequestStatusEditor({
           <h3>Ubah status pembelian</h3>
           <StatusBadge status={expectedStatus} />
         </div>
-        {!options.length && <p role="status">Status akhir tidak dapat diubah.</p>}
+        {!options.length && (
+          <p role="status">
+            {replacementBlocked(request)
+              ? 'Pembelian dijeda. Buka detail dan tuntaskan penawaran pengganti.'
+              : 'Status akhir tidak dapat diubah.'}
+          </p>
+        )}
         <Field id="next-status" label="Status berikutnya" error={errors.nextStatus?.message}>
           <FormSelect
             control={control}

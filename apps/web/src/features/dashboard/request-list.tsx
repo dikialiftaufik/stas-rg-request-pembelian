@@ -214,6 +214,9 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
             )}
           </div>
         )}
+        {user.role === 'admin' && (
+          <p className={styles.tableHint}>Klik status pengajuan untuk mengubahnya.</p>
+        )}
         <div
           className={styles.tableWrap}
           tabIndex={0}
@@ -373,7 +376,7 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
           description={`Hapus ${selected.item} dari daftar? Data contoh ini akan diarsipkan.`}
           confirmLabel="Hapus Request"
           onConfirm={() => {
-            deleteRequest(selected.id);
+            deleteRequest(selected.id, selected.revision);
             toast.success('Request berhasil dihapus.');
           }}
           onClose={close}
@@ -385,7 +388,7 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
           description={`Batalkan pengajuan ${selected.item}? Tindakan ini tidak dapat dibatalkan.`}
           confirmLabel="Batalkan Request"
           onConfirm={() => {
-            cancelRequest(selected.id);
+            cancelRequest(selected.id, selected.revision);
             toast.success('Request berhasil dibatalkan.');
           }}
           onClose={close}

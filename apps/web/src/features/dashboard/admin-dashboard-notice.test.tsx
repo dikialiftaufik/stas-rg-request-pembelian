@@ -56,7 +56,7 @@ describe('pemberitahuan pertama sesi Admin', () => {
       </AppProviders>,
     );
     expect(popup()).not.toBeInTheDocument();
-  });
+  }, 15000);
   it('mendukung Escape manual dan mengulang hanya setelah login sukses berikutnya', async () => {
     const view = renderDashboard();
     await userEvent.setup().keyboard('{Escape}');

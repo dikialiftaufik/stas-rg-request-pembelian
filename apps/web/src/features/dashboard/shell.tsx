@@ -120,7 +120,7 @@ export function DashboardShell() {
       ['edit', `Edit ${section}`],
       ['status', 'Ubah status pembelian'],
       ['invoice', 'Invoice Pembelian Barang'],
-      ['delivery', 'Informasi pengiriman'],
+      ['replacement', 'Penawaran pengganti'],
       ['import', 'Impor RAB'],
     ]);
     document.title = `${titles.get(path) ?? actionTitles.get(tail ?? '') ?? `Detail ${section}`} | STAS-RG Pembelian Barang`;

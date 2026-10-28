@@ -11,10 +11,12 @@ import {
   statusLabelMap,
   invoiceSchema,
   invoiceInputSchema,
-  fulfillmentInputSchema,
+  replacementInputSchema,
   rabItemInputSchema,
 } from './model';
 import type {
+  DemoRequest,
+  ReplacementProposal,
   DemoSnapshot,
   DemoUser,
   RequestInput,
@@ -24,7 +26,7 @@ import type {
   AttachmentRef,
   RabDocument,
   RabItemInput,
-  FulfillmentInput,
+  ReplacementInput,
   SubmissionStatus,
 } from './model';
 import { createSeed, demoAccounts } from './seed';
@@ -59,6 +61,14 @@ export function getSnapshot(): DemoSnapshot {
 }
 
 function publish(next: DemoSnapshot, strict = false) {
+  const previous = new Map(snapshot?.requests.map((row) => [row.id, row]));
+  next = {
+    ...next,
+    requests: next.requests.map((row) => {
+      const old = previous.get(row.id);
+      return old && old !== row ? { ...row, revision: old.revision + 1 } : row;
+    }),
+  };
   if (strict) {
     try {
       sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(snapshotSchema.parse(next)));
@@ -81,6 +91,7 @@ export function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 export function resetDemoState() {
+  snapshot = undefined;
   publish(createSeed());
 }
 export function reloadDemoState() {
@@ -146,6 +157,7 @@ export function saveRequest(
   input: RequestInput,
   id?: string,
   source?: { documentId: string; itemId: string },
+  expectedRevision?: number,
 ) {
   const user = requireUser(Boolean(id));
   if (!id && user.role !== 'pengaju') throw new Error('Pembuatan request tersedia untuk Pengaju.');
@@ -160,6 +172,18 @@ export function saveRequest(
       'Riset pengajuan harus sesuai riset perwakilan akun. Muat ulang form atau hubungi Admin.',
     );
   const existing = id ? visibleRequest(id) : undefined;
+  if (existing && expectedRevision !== undefined && existing.revision !== expectedRevision)
+    throw new Error('Data sudah berubah. Muat ulang form sebelum menyimpan.');
+  if (existing && replacementBlocked(existing))
+    throw new Error('Tuntaskan penawaran pengganti sebelum mengedit barang.');
+  if (
+    existing &&
+    existing.status !== 'pending_review' &&
+    (values.url !== existing.url || values.unitPrice !== existing.unitPrice)
+  )
+    throw new Error(
+      'Gunakan Ajukan link pengganti untuk mengubah tautan atau harga setelah persetujuan.',
+    );
   const research = data.research.find((item) => item.id === values.researchId);
   if (!research || (user.role === 'pengaju' && !user.researchIds.includes(research.id)))
     throw new Error('Jenis riset tidak dapat digunakan.');
@@ -192,6 +216,8 @@ export function saveRequest(
         createdAt: new Date().toISOString(),
         deleted: false,
         statusHistory: [],
+        replacements: [],
+        revision: 0,
         invoice: null,
         fulfillment: null,
         rabDocumentId: source?.documentId ?? null,
@@ -214,9 +240,10 @@ export function saveRequest(
   publish(next);
   return request.id;
 }
-export function deleteRequest(id: string) {
+export function deleteRequest(id: string, expectedRevision?: number) {
   requireUser(true);
   const request = visibleRequest(id);
+  ensureRevision(request, expectedRevision);
   const data = getSnapshot();
   publish(
     notification(
@@ -230,9 +257,10 @@ export function deleteRequest(id: string) {
     ),
   );
 }
-export function cancelRequest(id: string) {
+export function cancelRequest(id: string, expectedRevision?: number) {
   const user = requireUser();
   const request = visibleRequest(id);
+  ensureRevision(request, expectedRevision);
   if (user.role !== 'pengaju' || request.ownerId !== user.id || request.status !== 'pending_review')
     throw new Error('Hanya request sendiri yang menunggu persetujuan yang dapat dibatalkan.');
   const data = getSnapshot();
@@ -269,10 +297,12 @@ export function cancelRequest(id: string) {
 export function changeSubmissionStatus(input: {
   id: string;
   expectedStatus: SubmissionStatus;
+  expectedRevision?: number;
   nextStatus: SubmissionStatus;
 }) {
   requireUser(true);
   const request = visibleRequest(input.id);
+  ensureRevision(request, input.expectedRevision);
   const nextStatus = submissionStatusSchema.parse(input.nextStatus);
   if (request.submissionStatus !== input.expectedStatus)
     throw new Error(
@@ -294,11 +324,16 @@ export function changeSubmissionStatus(input: {
 export async function changeRequestStatus(input: {
   id: string;
   expectedStatus: RequestStatus;
+  expectedRevision?: number;
   nextStatus: RequestStatus;
   reason?: string;
 }) {
   const user = requireUser(true);
   let request = visibleRequest(input.id);
+  ensureRevision(request, input.expectedRevision);
+  const revision = request.revision;
+  if (replacementBlocked(request))
+    throw new Error('Pembelian dijeda. Tuntaskan penawaran pengganti terlebih dahulu.');
   if (input.nextStatus === 'completed') {
     if (
       !request.invoice ||
@@ -309,7 +344,7 @@ export async function changeRequestStatus(input: {
     const invoiceVersion = request.invoice.updatedAt;
     if (request.invoice.file) await getAttachment(request.invoice.file);
     request = visibleRequest(input.id);
-    if (request.invoice?.updatedAt !== invoiceVersion)
+    if (request.revision !== revision || request.invoice?.updatedAt !== invoiceVersion)
       throw new Error('Invoice berubah. Periksa invoice terbaru sebelum menyelesaikan request.');
     if (requireUser(true).id !== user.id)
       throw new Error('Sesi berubah. Buka kembali request untuk melanjutkan.');
@@ -357,6 +392,117 @@ export async function changeRequestStatus(input: {
       request.id,
       `${request.item}: ${statusLabelMap.get(nextStatus)}.${reason ? ` ${reason}` : ''}`,
     ),
+  );
+}
+
+function ensureRevision(request: DemoRequest, expected?: number) {
+  if (expected !== undefined && request.revision !== expected)
+    throw new Error('Data sudah berubah. Muat ulang halaman sebelum melanjutkan.');
+}
+export function replacementBlocked(request: Pick<DemoRequest, 'replacements'>) {
+  const latest = request.replacements.at(-1);
+  return Boolean(latest && latest.status !== 'accepted');
+}
+function replacementRequest(id: string, revision: number) {
+  const request = visibleRequest(id);
+  if (request.revision !== revision)
+    throw new Error('Data sudah berubah. Muat ulang halaman dan periksa penawaran terbaru.');
+  if (request.status !== 'approved' && request.status !== 'ordered')
+    throw new Error('Penawaran pengganti hanya tersedia setelah disetujui dan sebelum pengiriman.');
+  return request;
+}
+export function proposeReplacement(id: string, expectedRevision: number, input: ReplacementInput) {
+  const actor = requireUser(true);
+  const request = replacementRequest(id, expectedRevision);
+  if (request.replacements.at(-1)?.status === 'pending')
+    throw new Error('Tunggu tanggapan Pengaju sebelum mengirim penawaran lain.');
+  const values = replacementInputSchema.parse(input);
+  if (
+    values.url === request.url &&
+    requestTotal({ unitPrice: values.unitPrice, quantity: 1 }).eq(request.unitPrice)
+  )
+    throw new Error('Ubah tautan atau harga untuk mengirim penawaran pengganti.');
+  const proposal: ReplacementProposal = {
+    ...values,
+    id: crypto.randomUUID(),
+    previousUrl: request.url,
+    previousUnitPrice: request.unitPrice,
+    originStatus: request.status as 'approved' | 'ordered',
+    status: 'pending',
+    createdBy: actor.id,
+    createdAt: new Date().toISOString(),
+    respondedBy: null,
+    respondedAt: null,
+    response: '',
+  };
+  const data = getSnapshot();
+  publish(
+    notification(
+      {
+        ...data,
+        requests: data.requests.map((row) =>
+          row.id === id ? { ...row, replacements: [...row.replacements, proposal] } : row,
+        ),
+      },
+      request.ownerId,
+      id,
+      `Penawaran pengganti ${request.item} perlu Anda tinjau.`,
+    ),
+    true,
+  );
+}
+export function respondReplacement(
+  id: string,
+  expectedRevision: number,
+  proposalId: string,
+  decision: 'accepted' | 'rejected',
+  response = '',
+) {
+  const actor = requireUser();
+  const request = replacementRequest(id, expectedRevision);
+  if (actor.role !== 'pengaju' || actor.id !== request.ownerId)
+    throw new Error('Hanya Pengaju pemilik yang dapat menanggapi penawaran.');
+  const proposal = request.replacements.at(-1);
+  if (!proposal || proposal.id !== proposalId || proposal.status !== 'pending')
+    throw new Error('Penawaran ini sudah ditanggapi atau tidak tersedia.');
+  if (!['accepted', 'rejected'].includes(decision))
+    throw new Error('Pilihan tanggapan tidak valid.');
+  if (decision === 'rejected' && !response.trim())
+    throw new Error('Jelaskan alasan meminta alternatif lain.');
+  if (response.length > 2000) throw new Error('Tanggapan maksimal 2.000 karakter.');
+  const updated = {
+    ...request,
+    ...(decision === 'accepted' ? { url: proposal.url, unitPrice: proposal.unitPrice } : {}),
+    replacements: request.replacements.map((item) =>
+      item.id === proposalId
+        ? {
+            ...item,
+            status: decision,
+            response: response.trim(),
+            respondedBy: actor.id,
+            respondedAt: new Date().toISOString(),
+          }
+        : item,
+    ),
+  };
+  const data = getSnapshot();
+  const next = { ...data, requests: data.requests.map((row) => (row.id === id ? updated : row)) };
+  const research = data.research.find((row) => row.id === request.researchId);
+  if (
+    decision === 'accepted' &&
+    (!research || researchUsed(next, research.id).gt(research.allocated))
+  )
+    throw new Error(
+      'Alokasi tidak mencukupi. Minta Admin memperbarui alokasi; penawaran belum disetujui.',
+    );
+  publish(
+    notification(
+      next,
+      'demo-admin',
+      id,
+      `${request.item}: ${decision === 'accepted' ? 'penawaran pengganti disetujui.' : 'Pengaju meminta alternatif lain.'}`,
+    ),
+    true,
   );
 }
 
@@ -506,12 +652,14 @@ export async function saveInvoice(input: {
   file?: File | undefined;
   url: string;
   expectedUpdatedAt: string | null;
+  expectedRevision?: number;
   number: string;
   amount: string;
   invoiceDate: string;
 }) {
   const actor = requireUser(true);
   const original = visibleRequest(input.requestId);
+  ensureRevision(original, input.expectedRevision);
   if (!canManageInvoice(original.status))
     throw new Error('Invoice dapat ditambahkan setelah request disetujui.');
   const metadata = invoiceInputSchema.safeParse(input);
@@ -523,7 +671,11 @@ export async function saveInvoice(input: {
       stored = await putAttachment(input.file, await validateFile(input.file, 'invoice'), actor.id);
     const user = requireUser(true);
     const request = visibleRequest(input.requestId);
-    if (user.id !== actor.id || !canManageInvoice(request.status))
+    if (
+      request.revision !== original.revision ||
+      user.id !== actor.id ||
+      !canManageInvoice(request.status)
+    )
       throw new Error('Sesi atau status berubah. Buka kembali request.');
     if ((request.invoice?.updatedAt ?? null) !== input.expectedUpdatedAt)
       throw new Error('Invoice sudah berubah. Buka kembali dokumen terbaru.');
@@ -564,43 +716,6 @@ export async function saveInvoice(input: {
     if (stored) await removeAttachment(stored).catch(() => undefined);
     throw cause;
   }
-}
-export function saveFulfillment(input: {
-  requestId: string;
-  values: FulfillmentInput;
-  expectedUpdatedAt: string | null;
-}) {
-  const actor = requireUser(true);
-  const request = visibleRequest(input.requestId);
-  if (!canManageInvoice(request.status))
-    throw new Error('Informasi pengiriman tersedia setelah request disetujui.');
-  if ((request.fulfillment?.updatedAt ?? null) !== input.expectedUpdatedAt)
-    throw new Error(
-      'Informasi pengiriman sudah berubah. Muat ulang halaman lalu periksa data terbaru.',
-    );
-  const values = fulfillmentInputSchema.parse(input.values);
-  const fulfillment = {
-    ...values,
-    updatedAt: new Date(
-      Math.max(Date.now(), request.fulfillment ? Date.parse(request.fulfillment.updatedAt) + 1 : 0),
-    ).toISOString(),
-    updatedBy: actor.id,
-  };
-  const data = getSnapshot();
-  publish(
-    notification(
-      {
-        ...data,
-        requests: data.requests.map((item) =>
-          item.id === request.id ? { ...item, fulfillment } : item,
-        ),
-      },
-      request.ownerId,
-      request.id,
-      `Informasi pengiriman ${request.item} diperbarui.`,
-    ),
-    true,
-  );
 }
 export async function importRab(input: {
   researchId: string;

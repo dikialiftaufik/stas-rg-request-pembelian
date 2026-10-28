@@ -92,8 +92,9 @@ test('grafik Pengaju menyaring data pribadi dan mempertahankan pilihan periode',
   await expect(
     page.getByRole('heading', { level: 1, name: 'Request tidak tersedia' }),
   ).toBeVisible();
-  await page.goto('/requests/request-1/delivery');
-  await expect(page.getByRole('heading', { level: 1, name: 'Akses ditolak' })).toBeVisible();
+  await page.goto('/requests/request-1/replacement');
+  await expect(page.getByRole('heading', { level: 1, name: 'Penawaran pengganti' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Kirim untuk ditinjau Pengaju' })).toHaveCount(0);
 });
 
 test('halaman form menjaga perubahan dan mengembalikan konteks daftar', async ({ page }) => {
@@ -118,38 +119,6 @@ test('halaman form menjaga perubahan dan mengembalikan konteks daftar', async ({
   await expect(page.getByText('Halaman 2 dari 3', { exact: true })).toBeVisible();
   await page.goto('/requests?create=1&sourceRab=missing&sourceItem=missing&q=sensor');
   await expect(page.getByRole('heading', { name: 'Akses ditolak', level: 1 })).toBeVisible();
-});
-test('informasi pengiriman dan linimasa tersimpan tanpa memajukan status', async ({ page }) => {
-  await login(page);
-  await page.goto('/requests/request-1/status');
-  await page.getByRole('button', { name: 'Konfirmasi perubahan status' }).click();
-  await page.getByRole('link', { name: 'Isi informasi pengiriman', exact: true }).click();
-  await page.getByLabel('Pemasok', { exact: true }).fill('Mitra Laboratorium');
-  await page.getByLabel('Kurir', { exact: true }).fill('Kurir contoh');
-  await page.getByLabel('Nomor resi', { exact: true }).fill('00123456');
-  await page.getByLabel('Estimasi tiba', { exact: true }).fill('2026-11-15');
-  await page
-    .getByLabel('Catatan pengiriman', { exact: true })
-    .fill('Hubungi perwakilan riset saat tiba.');
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Estimasi tiba melewati' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Simpan pengiriman' }).click();
-  await expect(
-    page.getByText('Informasi pengiriman berhasil disimpan.', { exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('main')).toContainText('00123456');
-  await expect(page.locator('li[aria-current="step"]')).toContainText('Disetujui');
-  await page.getByRole('button', { name: 'Keluar', exact: true }).click();
-  await login(page, 'pengaju');
-  await page.goto('/requests/request-1');
-  await expect(page.getByRole('main')).toContainText('Mitra Laboratorium');
-  await expect(page.getByRole('link', { name: 'Edit pengiriman' })).toHaveCount(0);
-  await page.goto('/notifications');
-  await expect(page.getByRole('main')).toContainText(
-    'Informasi pengiriman Oscilloscope Digital diperbarui.',
-  );
 });
 test('invoice menyimpan nominal asli, tanggal dan kolom ekspor; warna ekspor konsisten', async ({
   page,

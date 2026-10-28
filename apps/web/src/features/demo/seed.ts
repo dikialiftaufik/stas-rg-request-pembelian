@@ -180,6 +180,8 @@ export function createSeed(now = new Date()): DemoSnapshot {
       researchId,
       quantity: 1,
       unit: 'unit',
+      replacements: [],
+      revision: 0,
       invoice: null,
       fulfillment: null,
       rabDocumentId: null,

@@ -167,6 +167,25 @@ export const statusChangeSchema = z.object({
   at: z.iso.datetime(),
   reason: z.string(),
 });
+export const replacementInputSchema = z.object({
+  url: webUrlSchema.refine(Boolean, 'Tautan pengganti wajib diisi.'),
+  unitPrice: positiveMoneySchema,
+  reason: z.string().trim().min(1, 'Jelaskan alasan penggantian.').max(2000),
+});
+export const replacementSchema = replacementInputSchema.extend({
+  id: z.string(),
+  previousUrl: z.string(),
+  previousUnitPrice: moneySchema,
+  originStatus: z.enum(['approved', 'ordered']),
+  status: z.enum(['pending', 'accepted', 'rejected']),
+  createdBy: z.string(),
+  createdAt: z.iso.datetime(),
+  respondedBy: z.string().nullable(),
+  respondedAt: z.iso.datetime().nullable(),
+  response: z.string(),
+});
+export type ReplacementProposal = z.infer<typeof replacementSchema>;
+export type ReplacementInput = z.infer<typeof replacementInputSchema>;
 export const requestSchema = requestInputSchema.extend({
   id: z.string(),
   ownerId: z.string(),
@@ -180,6 +199,8 @@ export const requestSchema = requestInputSchema.extend({
   createdAt: z.iso.datetime(),
   deleted: z.boolean(),
   statusHistory: z.array(statusChangeSchema).default([]),
+  replacements: z.array(replacementSchema).default([]),
+  revision: z.number().int().nonnegative().default(0),
 });
 const notificationSchema = z.object({
   id: z.string(),
