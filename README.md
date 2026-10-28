@@ -106,7 +106,7 @@ Ekspor menggunakan exceljs 4.4.0 yang dimuat saat dibutuhkan. Override uuid 11.1
 
 ## Invoice, RAB, analitik dan periode
 
-Admin melengkapi satu invoice aktif per request sejak status Disetujui: file PDF/PNG/JPEG/WebP maksimal 10 MB, tautan HTTP/HTTPS, atau keduanya. Pengaju hanya membaca invoice request miliknya. Penggantian meminta konfirmasi, mempertahankan file lama sampai transaksi baru berhasil, dan tidak mengumumkan keberhasilan saat penyimpanan gagal. Status Selesai memerlukan invoice yang valid serta file lokal yang masih tersedia; dokumen hilang harus diunggah ulang. Request lama yang sudah Selesai tidak diturunkan statusnya.
+Admin melengkapi satu invoice aktif per request sejak status Disetujui: file PDF/XLSX/DOCX/PNG/JPEG/WebP maksimal 10 MB, tautan HTTP/HTTPS, atau keduanya. Pengaju hanya membaca invoice request miliknya. Penggantian meminta konfirmasi, mempertahankan file lama sampai transaksi baru berhasil, dan tidak mengumumkan keberhasilan saat penyimpanan gagal. Status Selesai memerlukan invoice yang valid serta file lokal yang masih tersedia; dokumen hilang harus diunggah ulang. Request lama yang sudah Selesai tidak diturunkan statusnya.
 
 Metadata tervalidasi Zod berada di sessionStorage; Blob disimpan di IndexedDB `stas-rg-attachments-v1`, dengan namespace dari `stas-rg-files-session-v1` per tab. Berkas bertahan setelah refresh dan pergantian akun di tab yang sama. Tab lain tidak mendapat metadata atau akses melalui namespace baru. Data ini bukan cadangan: penghapusan data browser menghapus dokumen. Setelah tab ditutup, Blob lama dapat tetap menempati penyimpanan browser tetapi tidak ditampilkan dalam sesi baru; bersihkan data situs untuk menghapusnya. Jangan memakai dokumen sensitif untuk demo.
 
@@ -120,11 +120,11 @@ Filter rentang tanggal pengajuan bersifat inklusif WIB, default Semua tanggal, d
 
 ## Halaman dan perjalanan barang
 
-Semua form/detail menggunakan halaman. Rute barang: `/requests/new`, `/requests/:id`, serta subhalaman `/edit`, `/status`, `/invoice`, dan `/delivery`. RAB memakai `/requests/rab`, `/requests/rab/import`, dan `/requests/rab/:id`; profil dan notifikasi memakai `/profile` serta `/notifications`. URL lama tetap dialihkan. Form memperingatkan perubahan yang belum disimpan saat navigasi atau refresh.
+Semua form/detail menggunakan halaman. Rute barang: `/requests/new`, `/requests/:id`, serta subhalaman `/edit`, `/status`, `/invoice`, dan `/replacement`. RAB memakai `/requests/rab`, `/requests/rab/import`, dan `/requests/rab/:id`; profil dan notifikasi memakai `/profile` serta `/notifications`. URL lama tetap dialihkan. Form memperingatkan perubahan yang belum disimpan saat navigasi atau refresh.
 
 Invoice baru dan pembaruan membutuhkan nominal positif serta tanggal dokumen sampai hari ini (WIB). Total invoice dapat berbeda dari request tanpa mengubah komitmen; selisih ditampilkan dan nominal/tanggal masuk Excel. Snapshot lama mendapat metadata kosong; transisi baru menuju Selesai meminta kelengkapan, tanpa menurunkan status lama.
 
-Informasi pengiriman berupa pemasok, kurir, resi, estimasi tiba, dan catatan diperbarui manual oleh Admin. Mutasi memeriksa peran dan versi data; notifikasi dikirim ke Pengaju. Linimasa menggunakan status serta tanggal dari riwayat aktual, bukan estimasi tahap otomatis. Belum ada integrasi kurir, pembayaran, atau backend produksi.
+Informasi pengiriman tidak lagi ditampilkan. Proses pembelian menyediakan cabang penawaran pengganti sebelum pengiriman: Admin mengusulkan tautan dan harga satuan, Pengaju pemilik menyetujui atau meminta alternatif lain. Tahap pembelian dijeda sampai penawaran disetujui; revisi dan alokasi diperiksa sebelum penyimpanan. Metadata pengiriman lama tetap dibaca untuk kompatibilitas. Belum ada integrasi kurir, pembayaran, atau backend produksi.
 
 ## Komponen dan integrasi berikutnya
 
@@ -147,3 +147,5 @@ Decoder turunan Refine diperbarui ke decode-uri-component 0.5.0 dengan patch int
 ## Hasil verifikasi
 
 Jalankan pnpm.cmd check dan pnpm.cmd test:e2e untuk memverifikasi checkout. Laporan setup tambahan tersedia secara lokal di docs/hasil-setup.md, yang dikecualikan dari Git.
+
+Invoice Office menggunakan validasi struktur XLSX/DOCX tanpa makro/sandi, dengan unduhan untuk aplikasi dokumen. Admin mengunggah; Pengaju hanya mengunduh invoice miliknya. Nomor, nominal, tanggal dan aturan penyelesaian tetap berlaku.

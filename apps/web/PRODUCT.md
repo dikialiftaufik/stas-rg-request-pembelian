@@ -46,12 +46,20 @@ Katalog demo memuat enam RAB dan barang contoh dengan sumber CSV yang dapat dibu
 
 ## Routed workflows
 
-Tambah, edit, dan detail menggunakan halaman di dalam shell. Request mempunyai subhalaman status, invoice, dan pengiriman. Pengguna dan riset mempunyai detail serta editor; profil, notifikasi, impor RAB, dan detail RAB memiliki rute sendiri. URL lama dialihkan dengan konteks filter dan sumber RAB. Dialog dipakai untuk konfirmasi, popup sesi Admin, dan navigasi mobile. Perubahan belum disimpan dilindungi oleh useBlocker dan beforeunload.
+Tambah, edit, dan detail menggunakan halaman di dalam shell. Request mempunyai subhalaman status, invoice, dan penawaran pengganti. Pengguna dan riset mempunyai detail serta editor; profil, notifikasi, impor RAB, dan detail RAB memiliki rute sendiri. URL lama dialihkan dengan konteks filter dan sumber RAB. Dialog dipakai untuk konfirmasi, popup sesi Admin, dan navigasi mobile. Perubahan belum disimpan dilindungi oleh useBlocker dan beforeunload.
 
 Invoice menyimpan nominal asli serta tanggal dokumen yang tidak melewati hari ini. Nilai request, total invoice, dan selisih ditampilkan terpisah; pencatatan invoice tidak mengubah alokasi atau komitmen. Metadata invoice lama tetap kosong sampai dilengkapi. Penyelesaian baru membutuhkan metadata lengkap dan dokumen valid; status Selesai lama dipertahankan.
 
-Admin mengisi pemasok, kurir, resi, estimasi tiba, dan catatan secara manual sejak Disetujui sampai Selesai. Pengaju hanya melihat informasi request miliknya. Penyimpanan pengiriman tidak memajukan status. Linimasa menggunakan riwayat nyata; tanggal tahap yang tidak tercatat tidak direka. Perubahan pengiriman memiliki versi dan notifikasi.
+Informasi pengiriman telah digantikan oleh Proses pembelian dengan cabang penawaran pengganti. Riwayat status tetap mencatat tanggal nyata; metadata pengiriman lama hanya dipertahankan untuk kompatibilitas.
 
 ## Local persistence
 
 SessionStorage menyimpan metadata/sesi tanpa password. IndexedDB menyimpan dokumen dengan namespace tab; refresh dan pergantian akun tetap mempertahankan berkas. Sesi baru tidak menampilkan dokumen lama. Ini tidak menggantikan autentikasi server, audit produksi, backup atau penyimpanan dokumen terkelola.
+
+## Proses pembelian dan penawaran pengganti
+
+Antarmuka Informasi pengiriman dihapus. URL delivery lama mengarah ke detail barang; metadata fulfillment lama tetap terbaca tanpa editor atau mutasi pengiriman. Proses pembelian mempertahankan enam tahap utama dan menyediakan cabang pada Disetujui atau Sudah Dipesan. Admin mengajukan tautan/harga satuan pengganti melalui halaman replacement; nama, jumlah, satuan dan RAB asal tetap. Pengaju pemilik membandingkan penawaran lalu menyetujui atau meminta alternatif dengan alasan. Usulan belum disetujui menahan tahap berikutnya dan editor umum. Persetujuan memeriksa alokasi kembali dan menerapkan perubahan secara atomik. Riwayat usulan, revisi request, notifikasi dan toast mempertahankan konsistensi; snapshot lama mendapat default kosong.
+
+Cabang desktop mengikuti tahap asal dengan susunan vertikal pada mobile. Petunjuk menjelaskan posisi, pihak yang perlu bertindak, dan langkah berikutnya. Cabang selesai diringkas, riwayat lengkap tetap tersedia. Status pengajuan menggunakan badge lembut seperti status lain, tanpa panah, menu radio nonmodal, petunjuk klik untuk Admin dan target sentuh 44 px.
+
+Invoice menerima PDF, XLSX, DOCX, PNG, JPEG dan WebP hingga 10 MB. Office diperiksa struktur paketnya, ukuran hasil dekompresi dibatasi, serta makro/sandi ditolak. PDF/gambar dipratinjau; Office disediakan sebagai unduhan melalui aplikasi dokumen, tanpa konversi daring. Admin mengunggah dan Pengaju pemilik mengunduh. Invoice lama tidak ditimpa ketika penawaran disetujui; Admin mendapat petunjuk memeriksa kesesuaian dokumen.
