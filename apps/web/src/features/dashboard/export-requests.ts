@@ -36,7 +36,9 @@ export async function buildRequestWorkbook(
   rows.forEach((row) =>
     sheet.addRow({
       item: row.item,
-      owner: data.users.find((user) => user.id === row.ownerId)?.name ?? '',
+      owner:
+        data.users.find((user) => user.id === row.ownerId)?.name ??
+        (row.ownerId ? '' : 'Data impor'),
       research: data.research.find((item) => item.id === row.researchId)?.name ?? '',
       quantity: row.quantity,
       unitPrice: Number(row.unitPrice),

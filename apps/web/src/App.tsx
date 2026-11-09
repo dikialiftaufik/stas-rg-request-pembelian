@@ -1,3 +1,4 @@
+import { RequestImportPage } from './features/dashboard/request-import';
 import { ReplacementPage } from './features/dashboard/replacement';
 import logoUrl from '../../../assets/img/logo-stas-rg.png';
 import { Link, Outlet, Route, Routes, Navigate, useLocation } from 'react-router';
@@ -92,6 +93,7 @@ export function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/requests" element={<RequestsPage />} />
           <Route path="/requests/new" element={<RequestRecordPage mode="new" />} />
+          <Route path="/requests/import" element={<RequestImportPage />} />
           <Route path="/requests/rab" element={<RequestsPage />} />
           <Route path="/requests/rab/import" element={<RabRecordPage importing />} />
           <Route path="/requests/rab/:rabId" element={<RabRecordPage />} />

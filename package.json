@@ -4,10 +4,11 @@
   "private": true,
   "packageManager": "pnpm@12.15.0",
   "engines": {
-    "node": "24.22.1"
+    "node": ">=22.20.0"
   },
   "scripts": {
     "dev": "pnpm --filter @stas/web dev",
+    "dev:api": "pnpm --filter @stas/api dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

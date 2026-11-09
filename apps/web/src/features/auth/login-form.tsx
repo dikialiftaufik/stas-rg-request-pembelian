@@ -53,8 +53,10 @@ export function LoginForm() {
 
   const submit = handleSubmit(async (values) => {
     try {
-      const result = await login({ email: values.identifier, password: values.password });
-      if (!result.success) setError('root', { message: 'Email atau password salah.' });
+      const result = await login({ identifier: values.identifier, password: values.password });
+      if (!result.success) {
+        setError('root', { message: result.error?.message ?? 'ID/email atau password salah.' });
+      }
     } catch {
       setError('root', { message: 'Login gagal. Silakan coba lagi.' });
     }
@@ -135,7 +137,7 @@ export function LoginForm() {
         <ArrowRightIcon aria-hidden="true" />
       </Button>
       <p className={styles.status} role="status" aria-live="polite">
-        {isPending ? 'Memeriksa akun demo…' : ''}
+        {isPending ? 'Memeriksa kredensial…' : ''}
       </p>
       {errors.root?.message && (
         <p className={styles.error} role="alert">

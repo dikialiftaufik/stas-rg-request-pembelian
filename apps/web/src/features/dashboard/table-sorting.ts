@@ -79,7 +79,7 @@ export function sortRequests(
       case 'item':
         return row.item;
       case 'owner':
-        return users.get(row.ownerId) ?? '';
+        return row.ownerId ? (users.get(row.ownerId) ?? '') : 'Data impor';
       case 'research':
         return research.get(row.researchId) ?? '';
       case 'invoice':

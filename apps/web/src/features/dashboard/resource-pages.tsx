@@ -1,5 +1,6 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect } from 'react';
 import type { CSSProperties } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightStartOnRectangleIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -10,8 +11,15 @@ import {
   markNotificationsRead,
   scopedRequests,
   replacementBlocked,
+  syncResearchTypesFromServer,
+  syncSingleRequestFromServer,
+  syncSingleResearchTypeFromServer,
+  syncSingleUserFromServer,
   visibleRab,
 } from '../demo/store';
+import { fetchRequestByIdApi, markNotificationsReadApi } from '../requests/api';
+import { fetchResearchTypeByIdApi, fetchResearchTypesApi } from '../research-types/api';
+import { fetchUserByIdApi } from '../users/api';
 import { formatDate, formatMoney, requestTotal, statusLabelMap, researchUsed } from '../demo/model';
 import type { DemoRequest } from '../demo/model';
 import { allowedNextStatuses } from '../demo/request-workflow';
@@ -136,7 +144,20 @@ export function RequestRecordPage({
   const { requestId } = useParams();
   const navigate = useNavigate();
   const { back, link } = useRecordNavigation('/requests');
-  const request = user ? scopedRequests(data, user).find((row) => row.id === requestId) : undefined;
+  const shouldFetch = mode !== 'new' && Boolean(user && requestId);
+  const requestQuery = useQuery({
+    queryKey: ['requests', 'detail', requestId],
+    queryFn: () => fetchRequestByIdApi(requestId ?? ''),
+    enabled: shouldFetch,
+  });
+  useEffect(() => {
+    if (requestQuery.data) {
+      syncSingleRequestFromServer(requestQuery.data);
+    }
+  }, [requestQuery.data]);
+  const request =
+    requestQuery.data ??
+    (user ? scopedRequests(data, user).find((row) => row.id === requestId) : undefined);
   const saved = (id: string) => {
     void navigate(recordDestination(`/requests/${encodeURIComponent(id)}`, back), {
       replace: true,
@@ -149,6 +170,13 @@ export function RequestRecordPage({
     ) : (
       <AccessDenied />
     );
+  if (requestQuery.isLoading && !request) {
+    return (
+      <p className="p-6 text-sm" role="status">
+        Memuat data request…
+      </p>
+    );
+  }
   if (!request) return <UnavailablePage back={back} />;
   if (['edit', 'status'].includes(mode) && user.role !== 'admin') return <AccessDenied />;
   if (mode === 'edit' && replacementBlocked(request))
@@ -283,7 +311,7 @@ export function RequestRecordPage({
       <RecordCard title="Informasi barang">
         <dl className={styles.detailGrid}>
           {[
-            ['Pengaju', owner?.name],
+            ['Pengaju', owner?.name ?? (request.ownerId ? '—' : 'Data impor')],
             ['Riset', research?.name],
             ['Tanggal diajukan', formatDate(request.createdAt)],
             ['Tanggal kebutuhan', formatDate(request.requiredDate)],
@@ -316,13 +344,39 @@ export function RequestRecordPage({
 }
 
 export function UserRecordPage({ mode = 'view' }: { mode?: 'view' | 'new' | 'edit' }) {
-  const { data } = useDemo();
   const { userId } = useParams();
   const navigate = useNavigate();
   const { back, link } = useRecordNavigation('/users');
-  const record = data.users.find((person) => person.id === userId);
+  const userQuery = useQuery({
+    queryKey: ['users', userId],
+    queryFn: () => fetchUserByIdApi(userId ?? ''),
+    enabled: mode !== 'new' && Boolean(userId),
+  });
+  const researchQuery = useQuery({
+    queryKey: ['research-types'],
+    queryFn: () => fetchResearchTypesApi(),
+  });
+  useEffect(() => {
+    if (userQuery.data) {
+      syncSingleUserFromServer(userQuery.data);
+    }
+  }, [userQuery.data]);
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncResearchTypesFromServer(researchQuery.data.data);
+    }
+  }, [researchQuery.data]);
+  const record = userQuery.data;
+  const researchItems = researchQuery.data?.data ?? [];
   const saved = (id: string) =>
     void navigate(recordDestination(`/users/${id}`, back), { replace: true });
+  if (mode !== 'new' && userQuery.isLoading) {
+    return (
+      <p className="p-6 text-sm" role="status">
+        Memuat data akun…
+      </p>
+    );
+  }
   if (mode !== 'new' && !record)
     return <UnavailablePage title="Pengguna tidak tersedia" back={back} />;
   if (mode !== 'view')
@@ -335,23 +389,39 @@ export function UserRecordPage({ mode = 'view' }: { mode?: 'view' | 'new' | 'edi
       section="Manajemen Pengguna"
       actions={
         <Link className={styles.primaryButton} to={link(`/users/${record.id}/edit`)}>
-          Edit pengguna
+          Edit akun
         </Link>
       }
       aside={
         <RecordCard title="Hak akses">
           <p>{record.role === 'admin' ? 'Admin' : 'Pengaju'}</p>
-          <p className={styles.hint}>Akun tambahan merupakan data demo.</p>
+          <p>
+            <span
+              className={styles.accountStatus}
+              data-active={record.isActive ? 'true' : 'false'}
+            >
+              {record.isActive ? 'Aktif' : 'Nonaktif'}
+            </span>
+          </p>
+          <p className={styles.hint}>
+            {record.isActive
+              ? 'Akun aktif dapat login sesuai perannya.'
+              : 'Akun nonaktif tidak dapat login sampai diaktifkan kembali.'}
+          </p>
         </RecordCard>
       }
     >
-      <RecordCard title="Informasi pengguna">
+      <RecordCard title="Informasi akun">
         <dl className={styles.detailGrid}>
           {[
             ['Nama lengkap', record.name],
             ['NIP/NIM', record.identifier],
             ['Email', record.email],
             ['Tanggal dibuat', formatDate(record.createdAt)],
+            [
+              'Login terakhir',
+              record.lastLoginAt ? formatDate(record.lastLoginAt) : 'Belum pernah login',
+            ],
           ].map(([label, value]) => (
             <div key={label}>
               <dt>{label}</dt>
@@ -363,7 +433,7 @@ export function UserRecordPage({ mode = 'view' }: { mode?: 'view' | 'new' | 'edi
       <RecordCard title="Perwakilan riset">
         <ul className={styles.assignmentList}>
           {record.researchIds.map((id) => (
-            <li key={id}>{data.research.find((item) => item.id === id)?.name}</li>
+            <li key={id}>{researchItems.find((item) => item.id === id)?.name ?? id}</li>
           ))}
         </ul>
         {!record.researchIds.length && <p>Tidak ada perwakilan riset.</p>}
@@ -376,7 +446,25 @@ export function ResearchRecordPage({ mode = 'view' }: { mode?: 'view' | 'new' | 
   const { researchId } = useParams();
   const navigate = useNavigate();
   const { back, link } = useRecordNavigation('/research-types');
-  const record = data.research.find((item) => item.id === researchId);
+  const shouldFetch = mode !== 'new' && Boolean(researchId);
+  const researchQuery = useQuery({
+    queryKey: ['research-types', researchId],
+    queryFn: () => fetchResearchTypeByIdApi(researchId ?? ''),
+    enabled: shouldFetch,
+  });
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncSingleResearchTypeFromServer(researchQuery.data);
+    }
+  }, [researchQuery.data]);
+  const record = researchQuery.data ?? data.research.find((item) => item.id === researchId);
+  if (mode !== 'new' && researchQuery.isLoading && !record) {
+    return (
+      <p className="p-6 text-sm" role="status">
+        Memuat jenis riset…
+      </p>
+    );
+  }
   if (mode !== 'new' && !record)
     return <UnavailablePage title="Riset tidak tersedia" back={back} />;
   if (mode !== 'view')
@@ -392,7 +480,12 @@ export function ResearchRecordPage({ mode = 'view' }: { mode?: 'view' | 'new' | 
       />
     );
   if (!record) return null;
-  const used = researchUsed(data, record.id);
+  const used = researchQuery.data
+    ? new Decimal(researchQuery.data.committed)
+    : researchUsed(data, record.id);
+  const remaining = researchQuery.data
+    ? researchQuery.data.remaining
+    : new Decimal(record.allocated).minus(used).toString();
   return (
     <RecordPage
       title={record.name}
@@ -409,7 +502,7 @@ export function ResearchRecordPage({ mode = 'view' }: { mode?: 'view' | 'new' | 
             {[
               ['Alokasi', record.allocated],
               ['Komitmen', used.toString()],
-              ['Sisa alokasi', new Decimal(record.allocated).minus(used).toString()],
+              ['Sisa alokasi', remaining],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
@@ -504,9 +597,16 @@ export function ProfilePage() {
 }
 export function NotificationsPage() {
   const { data, user } = useDemo();
+  const queryClient = useQueryClient();
   const { link } = useRecordNavigation('/dashboard');
   const notifications = data.notifications.filter((item) => item.recipientId === user?.id);
   const unread = notifications.some((item) => !item.read);
+  const markRead = (ids?: string[]) => {
+    markNotificationsRead(ids);
+    void markNotificationsReadApi(ids)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['requests'] }))
+      .catch(() => undefined);
+  };
   return (
     <RecordPage
       title="Notifikasi"
@@ -518,7 +618,7 @@ export function NotificationsPage() {
           type="button"
           disabled={!unread}
           onClick={() => {
-            markNotificationsRead();
+            markRead();
             toast.success('Semua notifikasi ditandai dibaca.');
           }}
         >
@@ -537,7 +637,7 @@ export function NotificationsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      markNotificationsRead([item.id]);
+                      markRead([item.id]);
                       toast.success('Notifikasi ditandai dibaca.');
                     }}
                   >
@@ -546,7 +646,7 @@ export function NotificationsPage() {
                 )}
                 <Link
                   to={link(`/requests/${item.requestId}`)}
-                  onClick={() => markNotificationsRead([item.id])}
+                  onClick={() => markRead([item.id])}
                 >
                   Buka request
                 </Link>

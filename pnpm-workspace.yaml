@@ -7,7 +7,12 @@ engineStrict: true
 strictPeerDependencies: true
 strictDepBuilds: true
 allowBuilds:
+  '@nestjs/core': false
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': false
   esbuild: true
+  prisma: true
 skills:
   dirs: []
 overrides:

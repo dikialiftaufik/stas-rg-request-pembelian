@@ -619,6 +619,21 @@
   background: #edf0ea;
   color: #526448;
 }
+.accountStatus {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--ui-sage);
+  color: var(--ui-primary);
+}
+.accountStatus[data-active='false'] {
+  background: #f8e3e1;
+  color: #8f2d24;
+}
 .pagination {
   display: flex;
   align-items: center;
@@ -949,7 +964,7 @@
   padding: 2px 0;
 }
 .usersTable {
-  min-width: 1010px;
+  min-width: 1100px;
 }
 .usersTable th:last-child,
 .usersTable td:last-child {

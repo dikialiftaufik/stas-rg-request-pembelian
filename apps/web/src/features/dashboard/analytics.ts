@@ -99,7 +99,9 @@ export function urgencyAnalytics(data: DemoSnapshot, researchId = '', now = new 
       return {
         id: request.id,
         item: request.item,
-        owner: data.users.find((person) => person.id === request.ownerId)?.name ?? '',
+        owner:
+          data.users.find((person) => person.id === request.ownerId)?.name ??
+          (request.ownerId ? '' : 'Data impor'),
         research: data.research.find((item) => item.id === request.researchId)?.name ?? '',
         status: request.status,
         date: request.requiredDate,

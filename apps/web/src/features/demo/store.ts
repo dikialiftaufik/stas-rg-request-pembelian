@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import {
   snapshotSchema,
   userInputSchema,
@@ -9,6 +10,7 @@ import {
   statusSchema,
   submissionStatusSchema,
   statusLabelMap,
+  formatMoney,
   invoiceSchema,
   invoiceInputSchema,
   replacementInputSchema,
@@ -19,6 +21,7 @@ import type {
   ReplacementProposal,
   DemoSnapshot,
   DemoUser,
+  DemoResearch,
   RequestInput,
   UserInput,
   ResearchInput,
@@ -35,13 +38,25 @@ import { getAttachment, putAttachment, removeAttachment } from './attachment-db'
 import { validateFile } from './file-validation';
 import { upgradeDemo } from './upgrade-demo';
 import { demoRabCsv } from './demo-rab';
+import { downloadInvoiceFileApi } from '../requests/api';
+import type {
+  ApiNotification,
+  ImportRequestsPayload,
+  ImportRequestsResult,
+} from '../requests/api';
 
-export const DEMO_STORAGE_KEY = 'stas-rg-demo-v1';
+const LEGACY_DEMO_STORAGE_KEY = 'stas-rg-demo-v1';
+export const DEMO_STORAGE_KEY = 'stas-rg-live-v1';
 let snapshot: DemoSnapshot | undefined;
 const listeners = new Set<() => void>();
 
 export function getSnapshot(): DemoSnapshot {
   if (!snapshot) {
+    try {
+      sessionStorage.removeItem(LEGACY_DEMO_STORAGE_KEY);
+    } catch {
+      /* Ignore storage removal errors in restricted environments. */
+    }
     try {
       const saved = sessionStorage.getItem(DEMO_STORAGE_KEY);
       const parsed = saved ? snapshotSchema.parse(JSON.parse(saved) as unknown) : createSeed();
@@ -60,15 +75,17 @@ export function getSnapshot(): DemoSnapshot {
   return snapshot;
 }
 
-function publish(next: DemoSnapshot, strict = false) {
-  const previous = new Map(snapshot?.requests.map((row) => [row.id, row]));
-  next = {
-    ...next,
-    requests: next.requests.map((row) => {
-      const old = previous.get(row.id);
-      return old && old !== row ? { ...row, revision: old.revision + 1 } : row;
-    }),
-  };
+function publish(next: DemoSnapshot, strict = false, preserveRevision = false) {
+  if (!preserveRevision) {
+    const previous = new Map(snapshot?.requests.map((row) => [row.id, row]));
+    next = {
+      ...next,
+      requests: next.requests.map((row) => {
+        const old = previous.get(row.id);
+        return old && old !== row ? { ...row, revision: old.revision + 1 } : row;
+      }),
+    };
+  }
   if (strict) {
     try {
       sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(snapshotSchema.parse(next)));
@@ -100,9 +117,164 @@ export function reloadDemoState() {
 }
 
 export function currentUser(data = getSnapshot()): DemoUser | null {
-  const account = demoAccounts.find((item) => item.id === data.accountId);
-  const user = data.users.find((item) => item.id === account?.id);
-  return account && user ? { ...user, email: account.email, role: account.role } : null;
+  if (!data.accountId) return null;
+  return data.users.find((item) => item.id === data.accountId) ?? null;
+}
+export function setAuthenticatedUserSession(user: DemoUser) {
+  const data = getSnapshot();
+  const exists = data.users.some((item) => item.id === user.id);
+  const nextUsers = exists
+    ? data.users.map((item) => (item.id === user.id ? user : item))
+    : [...data.users, user];
+  publish({
+    ...data,
+    users: nextUsers,
+    accountId: user.id,
+    adminNoticeSeen: false,
+  });
+}
+export function clearAuthenticatedUserSession() {
+  const data = getSnapshot();
+  const referencedUserIds = new Set(data.rabDocuments.map((doc) => doc.createdBy));
+  const referencedResearchIds = new Set(data.rabDocuments.map((doc) => doc.researchId));
+  publish(
+    {
+      ...data,
+      accountId: null,
+      adminNoticeSeen: false,
+      users: data.users.filter((user) => referencedUserIds.has(user.id)),
+      research: data.research.filter((item) => referencedResearchIds.has(item.id)),
+      requests: [],
+      notifications: [],
+    },
+    false,
+    true,
+  );
+}
+export function syncResearchTypesFromServer(items: ReadonlyArray<DemoResearch>) {
+  const data = getSnapshot();
+  publish({
+    ...data,
+    research: [...items],
+  });
+}
+export function syncSingleResearchTypeFromServer(item: DemoResearch) {
+  const data = getSnapshot();
+  const exists = data.research.some((entry) => entry.id === item.id);
+  publish({
+    ...data,
+    research: exists
+      ? data.research.map((entry) => (entry.id === item.id ? item : entry))
+      : [...data.research, item],
+  });
+}
+export function removeResearchTypeFromStore(id: string) {
+  const data = getSnapshot();
+  publish({
+    ...data,
+    research: data.research.filter((entry) => entry.id !== id),
+  });
+}
+function toStoreUser(user: DemoUser): DemoUser {
+  return {
+    id: user.id,
+    name: user.name,
+    identifier: user.identifier,
+    email: user.email,
+    role: user.role,
+    researchIds: [...user.researchIds],
+    createdAt: user.createdAt,
+  };
+}
+/** Mengganti daftar pengguna lokal dengan data database, tanpa membuang pemilik request lokal. */
+export function syncUsersFromServer(items: ReadonlyArray<DemoUser>) {
+  const data = getSnapshot();
+  const serverIds = new Set(items.map((item) => item.id));
+  const referencedIds = new Set(data.requests.map((request) => request.ownerId));
+  const retained = data.users.filter((user) => !serverIds.has(user.id) && referencedIds.has(user.id));
+  publish({ ...data, users: [...items.map(toStoreUser), ...retained] });
+}
+export function syncSingleUserFromServer(item: DemoUser) {
+  const data = getSnapshot();
+  const user = toStoreUser(item);
+  const exists = data.users.some((entry) => entry.id === user.id);
+  publish({
+    ...data,
+    users: exists
+      ? data.users.map((entry) => (entry.id === user.id ? user : entry))
+      : [...data.users, user],
+  });
+}
+export function removeUserFromStore(id: string) {
+  const data = getSnapshot();
+  publish({ ...data, users: data.users.filter((entry) => entry.id !== id) }, false, true);
+}
+
+function normalizeServerRequest(item: DemoRequest, data: DemoSnapshot): DemoRequest {
+  if (item.rabDocumentId === null) {
+    return item;
+  }
+  const hasLocalRab = data.rabDocuments.some(
+    (doc) =>
+      doc.id === item.rabDocumentId &&
+      doc.researchId === item.researchId &&
+      doc.items.some((entry) => entry.id === item.rabItemId),
+  );
+  return hasLocalRab ? item : { ...item, rabDocumentId: null, rabItemId: null };
+}
+
+export function syncRequestsFromServer(payload: {
+  requests: ReadonlyArray<DemoRequest>;
+  participants: ReadonlyArray<DemoUser>;
+  notifications: ReadonlyArray<ApiNotification>;
+}) {
+  const data = getSnapshot();
+  const participantMap = new Map(payload.participants.map((item) => [item.id, toStoreUser(item)]));
+  const mergedUsers = data.users.map((existing) => participantMap.get(existing.id) ?? existing);
+  const existingIds = new Set(mergedUsers.map((item) => item.id));
+  for (const participant of participantMap.values()) {
+    if (!existingIds.has(participant.id)) {
+      mergedUsers.push(participant);
+    }
+  }
+  publish(
+    {
+      ...data,
+      users: mergedUsers,
+      requests: payload.requests.map((item) => normalizeServerRequest(item, data)),
+      notifications: [...payload.notifications],
+    },
+    false,
+    true,
+  );
+}
+
+export function syncSingleRequestFromServer(item: DemoRequest) {
+  const data = getSnapshot();
+  const normalized = normalizeServerRequest(item, data);
+  const exists = data.requests.some((entry) => entry.id === normalized.id);
+  publish(
+    {
+      ...data,
+      requests: exists
+        ? data.requests.map((entry) => (entry.id === normalized.id ? normalized : entry))
+        : [normalized, ...data.requests],
+    },
+    false,
+    true,
+  );
+}
+
+export function removeRequestFromStore(id: string) {
+  const data = getSnapshot();
+  publish(
+    {
+      ...data,
+      requests: data.requests.filter((entry) => entry.id !== id),
+    },
+    false,
+    true,
+  );
 }
 export function loginDemo(email: string, password: string) {
   const account = demoAccounts.find(
@@ -136,7 +308,13 @@ export function visibleRequest(id: string) {
   if (!request) throw new Error('Request tidak ditemukan atau tidak dapat diakses.');
   return request;
 }
-function notification(data: DemoSnapshot, recipientId: string, requestId: string, message: string) {
+function notification(
+  data: DemoSnapshot,
+  recipientId: string | null | undefined,
+  requestId: string,
+  message: string,
+) {
+  if (!recipientId) return data;
   return {
     ...data,
     notifications: [
@@ -634,6 +812,11 @@ export function canManageInvoice(status: RequestStatus) {
 export async function loadInvoiceFile(requestId: string) {
   const request = visibleRequest(requestId);
   if (!request.invoice?.file) throw new Error('Invoice belum memiliki file.');
+  if (request.invoice.file.sessionId === 'server') {
+    const blob = await downloadInvoiceFileApi(requestId);
+    visibleRequest(requestId);
+    return blob;
+  }
   const blob = await getAttachment(request.invoice.file);
   visibleRequest(requestId);
   return blob;
@@ -774,4 +957,98 @@ export async function importRab(input: {
     await removeAttachment(stored).catch(() => undefined);
     throw cause;
   }
+}
+
+/**
+ * Menyimpan data Pembelian Barang hasil impor (misal CSV/Excel) ke dalam store lokal.
+ */
+export function importRequestsToStore(payload: ImportRequestsPayload): ImportRequestsResult {
+  const actor = requireUser(true);
+  const data = getSnapshot();
+  const research = data.research.find((item) => item.id === payload.researchId);
+  if (!research) {
+    throw new Error('Jenis riset tujuan tidak ditemukan. Tambahkan jenis riset terlebih dahulu.');
+  }
+
+  const sourceLabel = payload.sourceName ? `Diimpor dari ${payload.sourceName}.` : 'Diimpor dari data historis.';
+  let importTotal = new Decimal(0);
+  let completedCount = 0;
+
+  const newRequests: DemoRequest[] = payload.rows.map((row, index) => {
+    const total = new Decimal(row.unitPrice).times(row.quantity);
+    importTotal = importTotal.plus(total);
+    if (row.completed) completedCount++;
+
+    const createdAt = new Date(Date.parse(`${row.date}T05:00:00.000Z`) + index).toISOString();
+    const notes = [sourceLabel, row.notes].filter(Boolean).join('\n');
+    const id = `import-${Date.now()}-${index}-${crypto.randomUUID().slice(0, 8)}`;
+
+    const request: DemoRequest = {
+      id,
+      ownerId: null,
+      researchId: payload.researchId,
+      item: row.item,
+      unit: 'unit',
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      requiredDate: row.date,
+      url: row.url ?? '',
+      notes,
+      status: row.completed ? 'completed' : 'pending_review',
+      submissionStatus: 'not_submitted',
+      createdAt,
+      deleted: false,
+      revision: 0,
+      rabDocumentId: null,
+      rabItemId: null,
+      invoice: row.completed
+        ? {
+            number: null,
+            amount: row.invoiceAmount ?? total.toFixed(),
+            invoiceDate: row.date,
+            file: null,
+            url: row.invoiceUrl ?? '',
+            updatedAt: createdAt,
+            updatedBy: actor.id,
+          }
+        : null,
+      fulfillment: null,
+      statusHistory: row.completed
+        ? [
+            {
+              from: 'pending_review',
+              to: 'completed',
+              actorId: actor.id,
+              at: createdAt,
+              reason: sourceLabel,
+            },
+          ]
+        : [],
+      replacements: [],
+    };
+    return request;
+  });
+
+  const nextSnapshot: DemoSnapshot = {
+    ...data,
+    requests: [...newRequests, ...data.requests],
+  };
+
+  const warnings: string[] = [];
+  const used = researchUsed(nextSnapshot, research.id);
+  if (used.gt(research.allocated)) {
+    warnings.push(
+      `Komitmen riset ${research.name} kini ${formatMoney(used)} dan melebihi alokasi ${formatMoney(research.allocated)}. Perbarui alokasi riset bila diperlukan.`,
+    );
+  }
+
+  publish(nextSnapshot, false, true);
+
+  return {
+    created: newRequests.length,
+    completed: completedCount,
+    pending: newRequests.length - completedCount,
+    total: importTotal.toFixed(),
+    warnings,
+  };
 }

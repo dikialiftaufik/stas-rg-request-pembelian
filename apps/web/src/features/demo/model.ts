@@ -188,7 +188,8 @@ export type ReplacementProposal = z.infer<typeof replacementSchema>;
 export type ReplacementInput = z.infer<typeof replacementInputSchema>;
 export const requestSchema = requestInputSchema.extend({
   id: z.string(),
-  ownerId: z.string(),
+  /** `null` untuk data historis hasil impor Admin yang belum memiliki Pengaju. */
+  ownerId: z.string().nullable(),
   unit: z.string().trim().min(1).default('unit'),
   invoice: invoiceSchema.nullable().default(null),
   fulfillment: fulfillmentSchema.nullable().default(null),
@@ -214,7 +215,7 @@ export const snapshotSchema = z
   .object({
     version: z.literal(1),
     demoRevision: z.number().int().nonnegative().default(0),
-    accountId: z.enum(['demo-admin', 'demo-pengaju']).nullable(),
+    accountId: z.string().nullable(),
     adminNoticeSeen: z.boolean().default(false),
     users: z.array(userSchema),
     research: z.array(researchSchema),
@@ -226,10 +227,10 @@ export const snapshotSchema = z
     const users = new Set(value.users.map((user) => user.id));
     const research = new Set(value.research.map((item) => item.id));
     if (
-      !users.has('demo-admin') ||
-      !users.has('demo-pengaju') ||
       value.requests.some(
-        (request) => !users.has(request.ownerId) || !research.has(request.researchId),
+        (request) =>
+          (request.ownerId !== null && !users.has(request.ownerId)) ||
+          !research.has(request.researchId),
       ) ||
       value.users.some((user) => user.researchIds.some((id) => !research.has(id))) ||
       value.rabDocuments.some(
@@ -275,6 +276,15 @@ export const statusLabels: Record<RequestStatus, string> = {
   cancelled: 'Dibatalkan',
 };
 export const statusLabelMap = new Map(Object.entries(statusLabels));
+/** Label pengaju untuk request historis hasil impor yang belum memiliki Pengaju. */
+export const NO_OWNER_LABEL = 'Data impor';
+export function ownerName(
+  users: ReadonlyArray<Pick<DemoUser, 'id' | 'name'>>,
+  ownerId: string | null,
+): string {
+  if (ownerId === null) return NO_OWNER_LABEL;
+  return users.find((user) => user.id === ownerId)?.name ?? '';
+}
 export const requestTotal = (request: Pick<DemoRequest, 'unitPrice' | 'quantity'>) =>
   new Decimal(request.unitPrice).times(request.quantity);
 export const formatMoney = (value: Decimal.Value) =>

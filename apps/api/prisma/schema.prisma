@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  pengaju
+
+  @@map("user_role")
+}
+
+enum RequestStatus {
+  pending_review
+  approved
+  ordered
+  in_transit
+  delivered
+  completed
+  rejected
+  cancelled
+
+  @@map("request_status")
+}
+
+enum SubmissionStatus {
+  not_submitted
+  submitted
+
+  @@map("submission_status")
+}
+
+enum ReplacementOriginStatus {
+  approved
+  ordered
+
+  @@map("replacement_origin_status")
+}
+
+enum ReplacementProposalStatus {
+  pending
+  accepted
+  rejected
+
+  @@map("replacement_proposal_status")
+}
+
+model User {
+  id                  String                   @id @default(cuid())
+  name                String
+  identifier          String                   @unique
+  email               String                   @unique
+  passwordHash        String                   @map("password_hash")
+  role                Role                     @default(pengaju)
+  isActive            Boolean                  @default(true) @map("is_active")
+  lastLoginAt         DateTime?                @map("last_login_at")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  researchAssignments UserResearchAssignment[]
+  ownedRequests       PurchaseRequest[]        @relation("RequestOwner")
+  statusChanges       RequestStatusHistory[]   @relation("StatusActor")
+  notifications       UserNotification[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model ResearchType {
+  id                  String                   @id @default(cuid())
+  name                String                   @unique
+  description         String                   @default("")
+  allocated           Decimal                  @db.Decimal(18, 2)
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  userAssignments     UserResearchAssignment[]
+  purchaseRequests    PurchaseRequest[]
+
+  @@map("research_types")
+}
+
+model UserResearchAssignment {
+  userId       String       @map("user_id")
+  researchId   String       @map("research_id")
+  assignedAt   DateTime     @default(now()) @map("assigned_at")
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  researchType ResearchType @relation(fields: [researchId], references: [id], onDelete: Restrict)
+
+  @@id([userId, researchId])
+  @@index([researchId])
+  @@map("user_research_assignments")
+}
+
+model PurchaseRequest {
+  id                 String                       @id @default(cuid())
+  ownerId            String?                      @map("owner_id")
+  researchId         String                       @map("research_id")
+  item               String
+  unit               String                       @default("unit")
+  quantity           Int
+  unitPrice          Decimal                      @map("unit_price") @db.Decimal(18, 2)
+  requiredDate       String                       @map("required_date")
+  url                String                       @default("")
+  notes              String                       @default("")
+  status             RequestStatus                @default(pending_review)
+  submissionStatus   SubmissionStatus             @default(not_submitted) @map("submission_status")
+  deleted            Boolean                      @default(false)
+  revision           Int                          @default(0)
+  rabDocumentId      String?                      @map("rab_document_id")
+  rabItemId          String?                      @map("rab_item_id")
+  invoiceNumber      String?                      @map("invoice_number")
+  invoiceAmount      Decimal?                     @map("invoice_amount") @db.Decimal(18, 2)
+  invoiceDate        String?                      @map("invoice_date")
+  invoiceUrl         String                       @default("") @map("invoice_url")
+  invoiceUpdatedAt   DateTime?                    @map("invoice_updated_at")
+  invoiceUpdatedById String?                      @map("invoice_updated_by_id")
+  createdAt          DateTime                     @default(now()) @map("created_at")
+  updatedAt          DateTime                     @updatedAt @map("updated_at")
+  owner              User?                        @relation("RequestOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  researchType       ResearchType                 @relation(fields: [researchId], references: [id], onDelete: Restrict)
+  invoiceFile        RequestInvoiceFile?
+  statusHistory      RequestStatusHistory[]
+  replacements       RequestReplacementProposal[]
+  notifications      UserNotification[]
+
+  @@index([ownerId])
+  @@index([researchId])
+  @@index([status])
+  @@index([deleted, createdAt])
+  @@map("purchase_requests")
+}
+
+model RequestStatusHistory {
+  id         String          @id @default(cuid())
+  requestId  String          @map("request_id")
+  fromStatus RequestStatus   @map("from_status")
+  toStatus   RequestStatus   @map("to_status")
+  actorId    String          @map("actor_id")
+  reason     String          @default("")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  request    PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor      User            @relation("StatusActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+  @@map("request_status_history")
+}
+
+model RequestReplacementProposal {
+  id                String                    @id @default(cuid())
+  requestId         String                    @map("request_id")
+  url               String
+  unitPrice         Decimal                   @map("unit_price") @db.Decimal(18, 2)
+  reason            String
+  previousUrl       String                    @default("") @map("previous_url")
+  previousUnitPrice Decimal                   @map("previous_unit_price") @db.Decimal(18, 2)
+  originStatus      ReplacementOriginStatus   @map("origin_status")
+  status            ReplacementProposalStatus @default(pending)
+  createdById       String                    @map("created_by_id")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  respondedById     String?                   @map("responded_by_id")
+  respondedAt       DateTime?                 @map("responded_at")
+  response          String                    @default("")
+  request           PurchaseRequest           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("request_replacement_proposals")
+}
+
+model RequestInvoiceFile {
+  id           String          @id @default(cuid())
+  requestId    String          @unique @map("request_id")
+  name         String
+  mime         String
+  size         Int
+  content      Bytes
+  uploadedById String          @map("uploaded_by_id")
+  uploadedAt   DateTime        @default(now()) @map("uploaded_at")
+  request      PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("request_invoice_files")
+}
+
+model UserNotification {
+  id          String          @id @default(cuid())
+  recipientId String          @map("recipient_id")
+  requestId   String          @map("request_id")
+  message     String
+  read        Boolean         @default(false)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  recipient   User            @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  request     PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, createdAt])
+  @@map("user_notifications")
+}

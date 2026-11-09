@@ -1,13 +1,15 @@
 import { FormSelect } from '@/components/ui/form-select';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { changeRequestStatus, replacementBlocked } from '../demo/store';
+import { replacementBlocked, syncSingleRequestFromServer } from '../demo/store';
 import { statusSchema, statusLabelMap } from '../demo/model';
 import type { DemoRequest } from '../demo/model';
 import { allowedNextStatuses } from '../demo/request-workflow';
+import { changeRequestStatusApi } from '../requests/api';
 import { Field, StatusBadge } from './shared';
 import { useUnsavedChanges } from './record-navigation';
 import { FieldGroup } from '@/components/ui/field';
@@ -31,6 +33,7 @@ export function RequestStatusEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [expectedRevision] = useState(request.revision);
   const [expectedStatus] = useState(request.status);
   const options = replacementBlocked(request) ? [] : allowedNextStatuses(expectedStatus);
@@ -48,7 +51,16 @@ export function RequestStatusEditor({
   const nextStatus = useWatch({ control, name: 'nextStatus' });
   const submit = handleSubmit(async (values) => {
     try {
-      await changeRequestStatus({ id: request.id, expectedStatus, expectedRevision, ...values });
+      const updated = await changeRequestStatusApi(request.id, {
+        expectedStatus,
+        expectedRevision,
+        ...values,
+      });
+      syncSingleRequestFromServer(updated);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['research-types'] }),
+      ]);
       toast.success(`Status ${request.item} berhasil diperbarui.`);
       markSaved();
       onSaved();

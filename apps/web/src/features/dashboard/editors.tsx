@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FormSelect } from '@/components/ui/form-select';
 import { ThemedSelect } from '@/components/ui/themed-select';
 import { z } from 'zod';
@@ -8,25 +9,30 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import Decimal from 'decimal.js';
 import { useDemo } from '../demo/use-demo';
-import { saveRequest, saveResearch, saveUser, scopedRabs } from '../demo/store';
+import {
+  scopedRabs,
+  syncResearchTypesFromServer,
+  syncSingleRequestFromServer,
+  syncSingleResearchTypeFromServer,
+  syncSingleUserFromServer,
+} from '../demo/store';
+import { createRequestApi, updateRequestApi } from '../requests/api';
+import {
+  createResearchTypeApi,
+  fetchResearchTypesApi,
+  updateResearchTypeApi,
+} from '../research-types/api';
+import { accountFormSchema, createUserApi, toAccountPayload, updateUserApi } from '../users/api';
+import type { AccountFormInput, AccountFormValues, ApiUserAccount } from '../users/api';
 import {
   requestInputSchema,
   researchInputSchema,
-  userInputSchema,
   formatMoney,
   requestDateLimits,
   validateRequestDate,
   moneySchema,
 } from '../demo/model';
-import type {
-  DemoRequest,
-  DemoResearch,
-  DemoUser,
-  RequestInput,
-  ResearchInput,
-  UserInput,
-} from '../demo/model';
-import { demoAccounts } from '../demo/seed';
+import type { DemoRequest, DemoResearch, RequestInput, ResearchInput } from '../demo/model';
 import { Field } from './shared';
 import { RecordPage, RecordCard } from './record-page';
 import { useUnsavedChanges, useRecordNavigation } from './record-navigation';
@@ -70,6 +76,16 @@ export function RequestEditor({
   onSaved: (id: string) => void;
 }) {
   const { data, user } = useDemo();
+  const queryClient = useQueryClient();
+  const researchQuery = useQuery({
+    queryKey: ['research-types'],
+    queryFn: () => fetchResearchTypesApi(),
+  });
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncResearchTypesFromServer(researchQuery.data.data);
+    }
+  }, [researchQuery.data]);
   const [expectedRevision] = useState(request?.revision);
   const limits = requestDateLimits();
   const [params] = useSearchParams();
@@ -113,7 +129,7 @@ export function RequestEditor({
     setError,
     setValue,
     setFocus,
-    formState: { errors, isDirty, isSubmitted },
+    formState: { errors, isDirty, isSubmitted, isSubmitting },
   } = useForm<RequestFormValues>({
     resolver: zodResolver(schema),
     shouldFocusError: false,
@@ -132,7 +148,7 @@ export function RequestEditor({
       itemId: initialItem?.id ?? '',
     },
   });
-  const { guard, markSaved } = useUnsavedChanges(isDirty);
+  const { guard, markSaved } = useUnsavedChanges(isDirty, isSubmitting);
   const { back } = useRecordNavigation();
   const [quantity, unitPrice] = useWatch({ control, name: ['quantity', 'unitPrice'] });
   const [sourceMode, documentId] = useWatch({ control, name: ['sourceMode', 'documentId'] });
@@ -158,19 +174,36 @@ export function RequestEditor({
       ? new Decimal(unitPrice).times(quantity)
       : new Decimal(0);
   const submit = handleSubmit(
-    (values) => {
+    async (values) => {
       try {
-        const savedId = saveRequest(
-          values,
-          request?.id,
-          !request && values.sourceMode === 'rab'
-            ? { documentId: values.documentId, itemId: values.itemId }
-            : undefined,
-          expectedRevision,
-        );
+        const basePayload: RequestInput = {
+          item: values.item,
+          unit: values.unit,
+          researchId: values.researchId,
+          quantity: values.quantity,
+          unitPrice: values.unitPrice,
+          requiredDate: values.requiredDate,
+          url: values.url,
+          notes: values.notes,
+        };
+        const saved = request
+          ? await updateRequestApi(request.id, {
+              ...basePayload,
+              expectedRevision,
+            })
+          : await createRequestApi({
+              ...basePayload,
+              rabDocumentId: values.sourceMode === 'rab' ? values.documentId : null,
+              rabItemId: values.sourceMode === 'rab' ? values.itemId : null,
+            });
+        syncSingleRequestFromServer(saved);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['requests'] }),
+          queryClient.invalidateQueries({ queryKey: ['research-types'] }),
+        ]);
         toast.success(request ? 'Request berhasil diperbarui.' : 'Request berhasil diajukan.');
         markSaved();
-        onSaved(savedId);
+        onSaved(saved.id);
       } catch (error) {
         setError('root', {
           message: error instanceof Error ? error.message : 'Request gagal disimpan.',
@@ -444,8 +477,14 @@ export function RequestEditor({
             )}
             <FormActions
               onClose={onClose}
-              label={request ? 'Simpan Perubahan' : 'Ajukan Request'}
-              disabled={!request && (!assigned || user?.researchIds.length !== 1)}
+              label={
+                isSubmitting
+                  ? 'Menyimpan…'
+                  : request
+                    ? 'Simpan Perubahan'
+                    : 'Ajukan Request'
+              }
+              disabled={isSubmitting || (!request && (!assigned || user?.researchIds.length !== 1))}
             />
           </FieldGroup>
         </form>
@@ -460,62 +499,84 @@ export function UserEditor({
   onClose,
   onSaved,
 }: {
-  user?: DemoUser | undefined;
+  user?: ApiUserAccount | undefined;
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
-  const { data } = useDemo();
-  const protectedAccount = demoAccounts.some((account) => account.id === editing?.id);
+  const { user: currentAccount } = useDemo();
+  const queryClient = useQueryClient();
+  const researchQuery = useQuery({
+    queryKey: ['research-types'],
+    queryFn: () => fetchResearchTypesApi(),
+  });
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncResearchTypesFromServer(researchQuery.data.data);
+    }
+  }, [researchQuery.data]);
+  const researchOptions = researchQuery.data?.data ?? [];
+  const isSelf = Boolean(editing && currentAccount?.id === editing.id);
   const {
     register,
     handleSubmit,
     control,
     setError,
-    formState: { errors, isDirty },
-  } = useForm<UserInput>({
-    resolver: zodResolver(userInputSchema),
-    defaultValues: editing ?? {
-      name: '',
-      identifier: '',
-      email: '',
-      role: 'pengaju',
-      researchIds: [],
+    formState: { errors, isDirty, isSubmitting },
+  } = useForm<AccountFormInput, unknown, AccountFormValues>({
+    resolver: zodResolver(accountFormSchema(editing ? 'edit' : 'create')),
+    defaultValues: {
+      name: editing?.name ?? '',
+      identifier: editing?.identifier ?? '',
+      email: editing?.email ?? '',
+      role: editing?.role ?? 'pengaju',
+      isActive: editing?.isActive ?? true,
+      researchIds: editing?.researchIds ?? [],
+      password: '',
+      confirmPassword: '',
     },
   });
   const { guard, markSaved } = useUnsavedChanges(isDirty);
   const { back } = useRecordNavigation('/users');
   const role = useWatch({ control, name: 'role' });
-  const submit = handleSubmit((values) => {
+  const submit = handleSubmit(async (values) => {
     try {
-      const savedId = saveUser(
-        { ...values, researchIds: values.role === 'admin' ? [] : values.researchIds },
-        editing?.id,
-      );
-      toast.success(editing ? 'Pengguna berhasil diperbarui.' : 'Pengguna berhasil ditambahkan.');
+      const payload = toAccountPayload(values);
+      const saved = editing
+        ? await updateUserApi(editing.id, payload)
+        : await createUserApi(payload);
+      syncSingleUserFromServer(saved);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['research-types'] }),
+      ]);
+      toast.success(editing ? 'Akun berhasil diperbarui.' : 'Akun berhasil ditambahkan.');
       markSaved();
-      onSaved(savedId);
+      onSaved(saved.id);
     } catch (error) {
       setError('root', {
-        message: error instanceof Error ? error.message : 'Pengguna gagal disimpan.',
+        message: error instanceof Error ? error.message : 'Akun gagal disimpan.',
       });
     }
   });
   return (
     <RecordPage
-      title={editing ? 'Edit Pengguna' : 'Tambah Pengguna'}
+      title={editing ? 'Edit Akun' : 'Tambah Akun'}
       back={back}
       section="Manajemen Pengguna"
       aside={
-        <RecordCard title="Akses pengguna">
-          <p>Pengaju hanya mengakses barang miliknya dan RAB riset yang diwakili.</p>
-          <p className={styles.hint}>Akun tambahan tidak menyediakan kredensial login baru.</p>
+        <RecordCard title="Akses akun">
+          <p>Admin mengelola seluruh data; Pengaju hanya mengakses request dan RAB riset yang diwakili.</p>
+          <p className={styles.hint}>
+            Password disimpan dalam bentuk hash. Kosongkan password saat edit bila tidak ingin
+            menggantinya.
+          </p>
+          {isSelf && (
+            <p className={styles.hint}>Peran dan status akun Anda sendiri tidak dapat diubah.</p>
+          )}
         </RecordCard>
       }
     >
-      <RecordCard title="Informasi pengguna">
-        <p className={styles.dialogDescription}>
-          Pengguna tambahan merupakan data contoh; login demo tetap menggunakan dua akun utama.
-        </p>
+      <RecordCard title="Informasi akun">
         <form
           autoComplete="off"
           noValidate
@@ -542,27 +603,68 @@ export function UserEditor({
                 {...register('email')}
                 {...fieldAttributes('user-email', errors.email?.message)}
                 type="email"
-                readOnly={protectedAccount}
                 required
               />
             </Field>
             <Field id="user-role" label="Peran" error={errors.role?.message}>
-              {protectedAccount ? (
-                <>
-                  <input id="user-role" value={role === 'admin' ? 'Admin' : 'Pengaju'} readOnly />
-                  <input type="hidden" {...register('role')} />
-                </>
-              ) : (
-                <FormSelect
-                  control={control}
-                  name="role"
-                  id="user-role"
-                  options={[
-                    { value: 'pengaju', label: 'Pengaju' },
-                    { value: 'admin', label: 'Admin' },
-                  ]}
-                />
-              )}
+              <FormSelect
+                control={control}
+                name="role"
+                id="user-role"
+                disabled={isSelf}
+                options={[
+                  { value: 'pengaju', label: 'Pengaju' },
+                  { value: 'admin', label: 'Admin' },
+                ]}
+              />
+            </Field>
+            <Field
+              id="user-password"
+              label={editing ? 'Password baru' : 'Password'}
+              error={errors.password?.message}
+              hint={editing ? 'Kosongkan bila tidak diganti. Minimal 8 karakter.' : 'Minimal 8 karakter.'}
+            >
+              <input
+                {...register('password')}
+                {...fieldAttributes('user-password', errors.password?.message)}
+                type="password"
+                autoComplete="new-password"
+                required={!editing}
+              />
+            </Field>
+            <Field
+              id="user-confirm-password"
+              label="Konfirmasi password"
+              error={errors.confirmPassword?.message}
+            >
+              <input
+                {...register('confirmPassword')}
+                {...fieldAttributes('user-confirm-password', errors.confirmPassword?.message)}
+                type="password"
+                autoComplete="new-password"
+                required={!editing}
+              />
+            </Field>
+            <Field id="user-status" label="Status akun" error={errors.isActive?.message}>
+              <Controller
+                control={control}
+                name="isActive"
+                render={({ field }) => (
+                  <ThemedSelect
+                    id="user-status"
+                    name={field.name}
+                    value={field.value ? 'active' : 'inactive'}
+                    triggerRef={field.ref}
+                    onBlur={field.onBlur}
+                    disabled={isSelf}
+                    onValueChange={(value) => field.onChange(value === 'active')}
+                    options={[
+                      { value: 'active', label: 'Aktif' },
+                      { value: 'inactive', label: 'Nonaktif (tidak bisa login)' },
+                    ]}
+                  />
+                )}
+              />
             </Field>
             {role === 'pengaju' && (
               <div className={styles.fullField}>
@@ -589,7 +691,7 @@ export function UserEditor({
                         }
                         options={[
                           { value: '', label: 'Pilih riset perwakilan' },
-                          ...data.research.map((project) => ({
+                          ...researchOptions.map((project) => ({
                             value: project.id,
                             label: project.name,
                           })),
@@ -605,7 +707,11 @@ export function UserEditor({
                 {errors.root.message}
               </p>
             )}
-            <FormActions onClose={onClose} />
+            <FormActions
+              onClose={onClose}
+              label={isSubmitting ? 'Menyimpan…' : 'Simpan'}
+              disabled={isSubmitting}
+            />
           </FieldGroup>
         </form>
         {guard}
@@ -623,25 +729,30 @@ export function ResearchEditor({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
+  const queryClient = useQueryClient();
   const {
     register,
     handleSubmit,
     setError,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, isSubmitting },
   } = useForm<ResearchInput>({
     resolver: zodResolver(researchInputSchema),
     defaultValues: research ?? { name: '', description: '', allocated: '' },
   });
   const { guard, markSaved } = useUnsavedChanges(isDirty);
   const { back } = useRecordNavigation('/research-types');
-  const submit = handleSubmit((values) => {
+  const submit = handleSubmit(async (values) => {
     try {
-      const savedId = saveResearch(values, research?.id);
+      const saved = research
+        ? await updateResearchTypeApi(research.id, values)
+        : await createResearchTypeApi(values);
+      syncSingleResearchTypeFromServer(saved);
+      await queryClient.invalidateQueries({ queryKey: ['research-types'] });
       toast.success(
         research ? 'Jenis riset berhasil diperbarui.' : 'Jenis riset berhasil ditambahkan.',
       );
       markSaved();
-      onSaved(savedId);
+      onSaved(saved.id);
     } catch (error) {
       setError('root', {
         message: error instanceof Error ? error.message : 'Jenis riset gagal disimpan.',
@@ -704,7 +815,11 @@ export function ResearchEditor({
                 {errors.root.message}
               </p>
             )}
-            <FormActions onClose={onClose} />
+            <FormActions
+              onClose={onClose}
+              label={isSubmitting ? 'Menyimpan…' : 'Simpan'}
+              disabled={isSubmitting}
+            />
           </FieldGroup>
         </form>
         {guard}

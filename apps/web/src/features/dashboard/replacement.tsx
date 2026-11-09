@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,11 +7,15 @@ import { toast } from 'sonner';
 import { FieldGroup } from '@/components/ui/field';
 import { useDemo } from '../demo/use-demo';
 import {
-  proposeReplacement,
-  respondReplacement,
   replacementBlocked,
   scopedRequests,
+  syncSingleRequestFromServer,
 } from '../demo/store';
+import {
+  fetchRequestByIdApi,
+  proposeReplacementApi,
+  respondReplacementApi,
+} from '../requests/api';
 import {
   replacementInputSchema,
   formatMoney,
@@ -134,17 +139,38 @@ export function ReplacementPage() {
   const { data, user } = useDemo();
   const { requestId } = useParams();
   const { back } = useRecordNavigation('/requests');
-  const request = user ? scopedRequests(data, user).find((row) => row.id === requestId) : undefined;
+  const requestQuery = useQuery({
+    queryKey: ['requests', 'detail', requestId],
+    queryFn: () => fetchRequestByIdApi(requestId ?? ''),
+    enabled: Boolean(user && requestId),
+  });
+  useEffect(() => {
+    if (requestQuery.data) {
+      syncSingleRequestFromServer(requestQuery.data);
+    }
+  }, [requestQuery.data]);
+  const request =
+    requestQuery.data ??
+    (user ? scopedRequests(data, user).find((row) => row.id === requestId) : undefined);
+  if (requestQuery.isLoading && !request) {
+    return (
+      <p className="p-6 text-sm" role="status">
+        Memuat penawaran…
+      </p>
+    );
+  }
   if (!request || !user) return <UnavailablePage back={back} />;
   return <ReplacementEditor key={request.id} request={request} />;
 }
 
 function ReplacementEditor({ request }: { request: DemoRequest }) {
   const { user } = useDemo();
+  const queryClient = useQueryClient();
   const { back } = useRecordNavigation(`/requests/${request.id}`);
   const navigate = useNavigate();
   const [revision] = useState(request.revision);
   const [response, setResponse] = useState('');
+  const [responding, setResponding] = useState(false);
   const [error, setError] = useState('');
   const responseError = error.startsWith('Jelaskan alasan') ? error : undefined;
   const {
@@ -164,7 +190,7 @@ function ReplacementEditor({ request }: { request: DemoRequest }) {
   const mayRespond = user?.role === 'pengaju' && latest?.status === 'pending' && eligible;
   const { guard, markSaved } = useUnsavedChanges(
     (mayPropose && isDirty) || (mayRespond && !!response),
-    isSubmitting,
+    isSubmitting || responding,
   );
   function saved(message: string) {
     markSaved();
@@ -173,25 +199,40 @@ function ReplacementEditor({ request }: { request: DemoRequest }) {
       replace: true,
     });
   }
-  const submit = handleSubmit((values) => {
+  const submit = handleSubmit(async (values) => {
     setError('');
     try {
-      proposeReplacement(request.id, revision, values);
+      const updated = await proposeReplacementApi(request.id, {
+        ...values,
+        expectedRevision: revision,
+      });
+      syncSingleRequestFromServer(updated);
+      await queryClient.invalidateQueries({ queryKey: ['requests'] });
       saved('Penawaran dikirim untuk ditinjau Pengaju.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Penawaran gagal disimpan. Coba lagi.');
     }
   });
-  function respond(decision: 'accepted' | 'rejected') {
-    if (!latest) return;
+  async function respond(decision: 'accepted' | 'rejected') {
+    if (!latest || responding) return;
     setError('');
     if (decision === 'rejected' && !response.trim()) {
       setError('Jelaskan alasan meminta alternatif lain.');
       document.getElementById('replacement-response')?.focus();
       return;
     }
+    setResponding(true);
     try {
-      respondReplacement(request.id, revision, latest.id, decision, response);
+      const updated = await respondReplacementApi(request.id, latest.id, {
+        decision,
+        response,
+        expectedRevision: revision,
+      });
+      syncSingleRequestFromServer(updated);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['requests'] }),
+        queryClient.invalidateQueries({ queryKey: ['research-types'] }),
+      ]);
       saved(
         decision === 'accepted'
           ? 'Penawaran disetujui. Admin dapat melanjutkan pembelian.'
@@ -199,6 +240,8 @@ function ReplacementEditor({ request }: { request: DemoRequest }) {
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Tanggapan gagal disimpan. Coba lagi.');
+    } finally {
+      setResponding(false);
     }
   }
   return (
@@ -355,16 +398,18 @@ function ReplacementEditor({ request }: { request: DemoRequest }) {
                   <button
                     type="button"
                     className={styles.secondaryButton}
-                    onClick={() => respond('rejected')}
+                    disabled={responding}
+                    onClick={() => void respond('rejected')}
                   >
-                    Minta alternatif lain
+                    {responding ? 'Memproses…' : 'Minta alternatif lain'}
                   </button>
                   <button
                     type="button"
                     className={styles.primaryButton}
-                    onClick={() => respond('accepted')}
+                    disabled={responding}
+                    onClick={() => void respond('accepted')}
                   >
-                    Setujui penawaran
+                    {responding ? 'Memproses…' : 'Setujui penawaran'}
                   </button>
                 </div>
               </FieldGroup>

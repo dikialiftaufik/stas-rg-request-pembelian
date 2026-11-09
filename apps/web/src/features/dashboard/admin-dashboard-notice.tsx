@@ -40,8 +40,9 @@ export function AdminDashboardNotice() {
           <li key={request.id}>
             <strong>{request.item}</strong>
             <span>
-              {data.users.find((item) => item.id === request.ownerId)?.name} ·{' '}
-              {formatMoney(requestTotal(request))}
+              {data.users.find((item) => item.id === request.ownerId)?.name ??
+                (request.ownerId ? '' : 'Data impor')}{' '}
+              · {formatMoney(requestTotal(request))}
             </span>
           </li>
         ))}

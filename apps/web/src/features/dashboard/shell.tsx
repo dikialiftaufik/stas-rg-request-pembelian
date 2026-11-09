@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, Link } from 'react-router';
 import { useDemoLogout } from '../auth/use-demo-logout';
 import {
@@ -14,7 +15,10 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import logoUrl from '../../../../../assets/img/logo-stas-rg.png';
+import { syncRequestsFromServer, syncResearchTypesFromServer } from '../demo/store';
 import { useDemo } from '../demo/use-demo';
+import { fetchRequestsApi } from '../requests/api';
+import { fetchResearchTypesApi } from '../research-types/api';
 import { Modal } from './shared';
 import styles from './dashboard.module.css';
 
@@ -92,6 +96,28 @@ export function DashboardShell() {
   const [overlay, setOverlay] = useState<'menu' | null>(null);
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
+  const researchQuery = useQuery({
+    queryKey: ['research-types'],
+    queryFn: () => fetchResearchTypesApi(),
+    enabled: Boolean(user),
+    refetchInterval: 15000,
+  });
+  const requestsQuery = useQuery({
+    queryKey: ['requests', user?.id],
+    queryFn: () => fetchRequestsApi(),
+    enabled: Boolean(user),
+    refetchInterval: 8000,
+  });
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncResearchTypesFromServer(researchQuery.data.data);
+    }
+  }, [researchQuery.data]);
+  useEffect(() => {
+    if (requestsQuery.data) {
+      syncRequestsFromServer(requestsQuery.data);
+    }
+  }, [requestsQuery.data]);
   useEffect(() => {
     const previous = document.title;
     const titles = new Map(
@@ -121,7 +147,7 @@ export function DashboardShell() {
       ['status', 'Ubah status pembelian'],
       ['invoice', 'Invoice Pembelian Barang'],
       ['replacement', 'Penawaran pengganti'],
-      ['import', 'Impor RAB'],
+      ['import', path.startsWith('/requests/rab') ? 'Impor RAB' : 'Impor Pembelian Barang'],
     ]);
     document.title = `${titles.get(path) ?? actionTitles.get(tail ?? '') ?? `Detail ${section}`} | STAS-RG Pembelian Barang`;
     let restored = 0;

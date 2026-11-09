@@ -1,6 +1,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { RabList } from './rab-list';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router';
 import { toast } from 'sonner';
 import Decimal from 'decimal.js';
@@ -14,9 +15,16 @@ import {
   WalletIcon,
 } from '@heroicons/react/24/outline';
 import { useDemo } from '../demo/use-demo';
-import { dashboardSummary, deleteUser, deleteResearch } from '../demo/store';
+import {
+  dashboardSummary,
+  removeResearchTypeFromStore,
+  removeUserFromStore,
+  syncResearchTypesFromServer,
+  syncUsersFromServer,
+} from '../demo/store';
+import { deleteResearchTypeApi, fetchResearchTypesApi } from '../research-types/api';
+import { deleteUserApi, fetchUsersApi } from '../users/api';
 import { formatMoney, formatDate, researchUsed } from '../demo/model';
-import { demoAccounts } from '../demo/seed';
 import { ConfirmDialog, PageHeading, Pagination } from './shared';
 import { RequestList } from './request-list';
 import { AdminDashboardNotice } from './admin-dashboard-notice';
@@ -195,16 +203,37 @@ const userHeaders = [
 ] as const;
 
 export function UsersPage() {
-  const { data } = useDemo();
+  const { data, user: currentAccount } = useDemo();
+  const queryClient = useQueryClient();
   const { link } = useRecordNavigation('/users');
   const [params, setParams] = useSearchParams();
   const [action, setAction] = useState<EntityAction | null>(null);
+  const usersQuery = useQuery({
+    queryKey: ['users'],
+    queryFn: () => fetchUsersApi(),
+  });
+  const researchQuery = useQuery({
+    queryKey: ['research-types'],
+    queryFn: () => fetchResearchTypesApi(),
+  });
+  useEffect(() => {
+    if (usersQuery.data) {
+      syncUsersFromServer(usersQuery.data.data);
+    }
+  }, [usersQuery.data]);
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncResearchTypesFromServer(researchQuery.data.data);
+    }
+  }, [researchQuery.data]);
+  const serverUsers = usersQuery.data?.data ?? [];
+  const accountMap = new Map(serverUsers.map((item) => [item.id, item]));
   const query = params.get('q') ?? '';
   const sort = readSort(params, userColumns, 'name', 'asc');
   const requestedSize = Number(params.get('size'));
   const size = [5, 10, 20].includes(requestedSize) ? requestedSize : 5;
   const users = sortUsers(
-    data.users.filter((user) =>
+    serverUsers.filter((user) =>
       `${user.name} ${user.identifier} ${user.email} ${representedResearch(user, data).join(' ')}`
         .toLocaleLowerCase('id')
         .includes(query.toLocaleLowerCase('id').trim()),
@@ -222,7 +251,7 @@ export function UsersPage() {
     ),
   );
   const editing =
-    action && 'id' in action ? data.users.find((item) => item.id === action.id) : undefined;
+    action && 'id' in action ? serverUsers.find((item) => item.id === action.id) : undefined;
   const close = () => setAction(null);
   function choose(next: EntityAction) {
     setAction(next);
@@ -238,14 +267,21 @@ export function UsersPage() {
     <>
       <PageHeading
         title="Manajemen Pengguna"
-        description="Kelola akun, peran, dan perwakilan riset."
+        description="Kelola akun login, peran, status aktif, dan perwakilan riset."
         action={
           <Link className={styles.primaryButton} to={link('/users/new')} onClick={rememberScroll}>
             <PlusIcon aria-hidden="true" />
-            Tambah Pengguna
+            Tambah Akun
           </Link>
         }
       />
+      {usersQuery.isError && (
+        <p className={styles.formError} role="alert">
+          {usersQuery.error instanceof Error
+            ? usersQuery.error.message
+            : 'Gagal memuat data akun dari database.'}
+        </p>
+      )}
       <section className={styles.dataPanel} aria-label="Daftar pengguna">
         <div className={styles.filters}>
           <div className={styles.search}>
@@ -277,6 +313,7 @@ export function UsersPage() {
                     }
                   />
                 ))}
+                <th scope="col">Status</th>
                 <th scope="col">Aksi</th>
               </tr>
             </thead>
@@ -300,6 +337,14 @@ export function UsersPage() {
                   </td>
                   <td className={styles.dateCell}>{formatDate(user.createdAt)}</td>
                   <td>
+                    <span
+                      className={styles.accountStatus}
+                      data-active={accountMap.get(user.id)?.isActive === false ? 'false' : 'true'}
+                    >
+                      {accountMap.get(user.id)?.isActive === false ? 'Nonaktif' : 'Aktif'}
+                    </span>
+                  </td>
+                  <td>
                     <ActionMenu
                       label={`Aksi ${user.name}`}
                       items={[
@@ -310,8 +355,8 @@ export function UsersPage() {
                         {
                           label: `Hapus ${user.name}`,
                           danger: true,
-                          disabled: demoAccounts.some((account) => account.id === user.id),
-                          hint: 'Akun demo utama tidak dapat dihapus',
+                          disabled: user.id === currentAccount?.id,
+                          hint: 'Akun yang sedang dipakai tidak dapat dihapus',
                           onSelect: () => choose({ kind: 'delete', id: user.id }),
                         },
                       ]}
@@ -321,11 +366,17 @@ export function UsersPage() {
               ))}
             </tbody>
           </table>
-          {users.length === 0 && (
-            <div className={styles.empty}>
-              <strong>Tidak ada pengguna yang sesuai.</strong>
-              <p>Coba nama atau email lainnya.</p>
+          {usersQuery.isLoading && users.length === 0 ? (
+            <div className={styles.empty} role="status">
+              <strong>Memuat data akun dari database…</strong>
             </div>
+          ) : (
+            users.length === 0 && (
+              <div className={styles.empty}>
+                <strong>Tidak ada pengguna yang sesuai.</strong>
+                <p>Coba nama atau email lainnya.</p>
+              </div>
+            )
           )}
         </div>
         <Pagination
@@ -338,12 +389,14 @@ export function UsersPage() {
       </section>
       {action?.kind === 'delete' && editing && (
         <ConfirmDialog
-          title="Hapus Pengguna"
-          description={`Hapus ${editing.name} dari data contoh? Pengguna yang masih dirujuk request tidak dapat dihapus.`}
-          confirmLabel="Hapus Pengguna"
-          onConfirm={() => {
-            deleteUser(editing.id);
-            toast.success('Pengguna berhasil dihapus.');
+          title="Hapus Akun"
+          description={`Hapus akun ${editing.name} secara permanen? Pertimbangkan menonaktifkan akun bila datanya masih diperlukan.`}
+          confirmLabel="Hapus Akun"
+          onConfirm={async () => {
+            await deleteUserApi(editing.id);
+            removeUserFromStore(editing.id);
+            await queryClient.invalidateQueries({ queryKey: ['users'] });
+            toast.success('Akun berhasil dihapus.');
           }}
           onClose={close}
         />
@@ -354,6 +407,7 @@ export function UsersPage() {
 
 export function ResearchPage() {
   const { data } = useDemo();
+  const queryClient = useQueryClient();
   const { link } = useRecordNavigation('/research-types');
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
@@ -364,11 +418,30 @@ export function ResearchPage() {
     setParams(next, { replace: true });
   };
   const [action, setAction] = useState<EntityAction | null>(null);
-  const allocation = data.research.reduce((sum, item) => sum.plus(item.allocated), new Decimal(0));
-  const used = data.research.reduce(
+  const researchQuery = useQuery({
+    queryKey: ['research-types'],
+    queryFn: () => fetchResearchTypesApi(),
+  });
+  useEffect(() => {
+    if (researchQuery.data) {
+      syncResearchTypesFromServer(researchQuery.data.data);
+    }
+  }, [researchQuery.data]);
+  const serverItemMap = new Map(researchQuery.data?.data.map((item) => [item.id, item]) ?? []);
+  const computedAllocation = data.research.reduce(
+    (sum, item) => sum.plus(item.allocated),
+    new Decimal(0),
+  );
+  const computedUsed = data.research.reduce(
     (sum, item) => sum.plus(researchUsed(data, item.id)),
     new Decimal(0),
   );
+  const summary = researchQuery.data?.meta.summary;
+  const totalAllocated = summary ? new Decimal(summary.totalAllocated) : computedAllocation;
+  const totalCommitted = summary ? new Decimal(summary.totalCommitted) : computedUsed;
+  const totalRemaining = summary
+    ? new Decimal(summary.totalRemaining)
+    : computedAllocation.minus(computedUsed);
   const filtered = data.research.filter((item) =>
     `${item.name} ${item.description}`
       .toLocaleLowerCase('id')
@@ -398,16 +471,16 @@ export function ResearchPage() {
       />
       <div className={styles.sectionHeading}>
         <h2>Rekap Dana Riset</h2>
-        <p>Ringkasan alokasi dan request aktif pada data contoh.</p>
+        <p>Ringkasan alokasi dan komitmen dana seluruh jenis riset.</p>
       </div>
       <section
         className={`${styles.stats} ${styles.fundingStats}`}
         aria-label="Ringkasan dana riset"
       >
         {[
-          ['Total alokasi', allocation],
-          ['Dana berkomitmen', used],
-          ['Sisa dana', allocation.minus(used)],
+          ['Total alokasi', totalAllocated],
+          ['Dana berkomitmen', totalCommitted],
+          ['Sisa dana', totalRemaining],
         ].map(([label, value]) => (
           <article className={styles.statCard} key={String(label)}>
             <div>
@@ -430,10 +503,30 @@ export function ResearchPage() {
           onInput={(event) => setQuery(event.currentTarget.value)}
         />
       </div>
+      {researchQuery.isError && (
+        <p className={styles.formError} role="alert">
+          {researchQuery.error instanceof Error
+            ? researchQuery.error.message
+            : 'Gagal memuat data jenis riset dari database.'}
+        </p>
+      )}
       <section className={styles.researchGrid} aria-label="Daftar jenis riset">
         {filtered.map((item) => {
-          const spending = researchUsed(data, item.id);
-          const percent = spending.div(item.allocated).times(100).toDecimalPlaces(0).toNumber();
+          const serverItem = serverItemMap.get(item.id);
+          const spending = serverItem
+            ? new Decimal(serverItem.committed)
+            : researchUsed(data, item.id);
+          const remaining = serverItem
+            ? new Decimal(serverItem.remaining)
+            : new Decimal(item.allocated).minus(spending);
+          const requestCount = serverItem
+            ? serverItem.requestCount
+            : data.requests.filter((request) => !request.deleted && request.researchId === item.id)
+                .length;
+          const allocatedDec = new Decimal(item.allocated);
+          const percent = allocatedDec.gt(0)
+            ? spending.div(allocatedDec).times(100).toDecimalPlaces(0).toNumber()
+            : 0;
           return (
             <article className={styles.researchCard} key={item.id}>
               <h2>
@@ -442,12 +535,7 @@ export function ResearchPage() {
                 </Link>
               </h2>
               <p>
-                {
-                  data.requests.filter(
-                    (request) => !request.deleted && request.researchId === item.id,
-                  ).length
-                }{' '}
-                request tercatat · {percent}% terikat
+                {requestCount} request tercatat · {percent}% terikat
               </p>
               <progress value={percent} max={100} aria-label={`Komitmen dana ${item.name}`} />
               <div className={styles.researchMoney}>
@@ -457,7 +545,7 @@ export function ResearchPage() {
                 </div>
                 <div>
                   <span>Sisa</span>
-                  <strong>{formatMoney(new Decimal(item.allocated).minus(spending))}</strong>
+                  <strong>{formatMoney(remaining)}</strong>
                 </div>
               </div>
               <div className={styles.researchActions}>
@@ -480,16 +568,28 @@ export function ResearchPage() {
           );
         })}
       </section>
-      {filtered.length === 0 && (
-        <p className={styles.empty}>Tidak ada jenis riset yang sesuai pencarian.</p>
+      {researchQuery.isLoading && data.research.length === 0 ? (
+        <p className={styles.empty} role="status">
+          Memuat data jenis riset dari database…
+        </p>
+      ) : (
+        filtered.length === 0 && (
+          <p className={styles.empty}>
+            {data.research.length === 0 && !query.trim()
+              ? 'Belum ada jenis riset di database. Klik Tambah Jenis Riset untuk membuat data baru.'
+              : 'Tidak ada jenis riset yang sesuai pencarian.'}
+          </p>
+        )
       )}
       {action?.kind === 'delete' && editing && (
         <ConfirmDialog
           title="Hapus Jenis Riset"
           description={`Hapus ${editing.name}? Riset yang masih dirujuk request atau pengguna tidak dapat dihapus.`}
           confirmLabel="Hapus Jenis Riset"
-          onConfirm={() => {
-            deleteResearch(editing.id);
+          onConfirm={async () => {
+            await deleteResearchTypeApi(editing.id);
+            removeResearchTypeFromStore(editing.id);
+            await queryClient.invalidateQueries({ queryKey: ['research-types'] });
             toast.success('Jenis riset berhasil dihapus.');
           }}
           onClose={close}

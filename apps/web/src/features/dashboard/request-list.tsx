@@ -5,17 +5,24 @@ import { PartyHeader } from './party-header';
 import { InvoiceCell } from './invoice';
 import { SubmissionStatusCell } from './submission-status';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import {
   ArrowDownTrayIcon,
   ArrowRightIcon,
+  ArrowUpTrayIcon,
   EyeIcon,
   MagnifyingGlassIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline';
 import { useDemo } from '../demo/use-demo';
-import { scopedRequests, deleteRequest, cancelRequest } from '../demo/store';
+import {
+  scopedRequests,
+  removeRequestFromStore,
+  syncSingleRequestFromServer,
+} from '../demo/store';
+import { cancelRequestApi, deleteRequestApi } from '../requests/api';
 import { requestTotal, formatMoney, formatDate, statusLabels, statusSchema } from '../demo/model';
 import { allowedNextStatuses } from '../demo/request-workflow';
 import { ConfirmDialog, Pagination, StatusBadge } from './shared';
@@ -40,6 +47,7 @@ const columns = [
 
 export function RequestList({ recent = false }: { recent?: boolean }) {
   const { data, user } = useDemo();
+  const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const { link } = useRecordNavigation();
   const [action, setAction] = useState<Action | null>(null);
@@ -61,7 +69,9 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
   const range = recent ? null : readDateRange(params);
   const filtered = sortRequests(
     base.filter((request) => {
-      const owner = data.users.find((item) => item.id === request.ownerId)?.name ?? '';
+      const owner =
+        data.users.find((item) => item.id === request.ownerId)?.name ??
+        (request.ownerId ? '' : 'Data impor');
       const researchName = data.research.find((item) => item.id === request.researchId)?.name ?? '';
       return (
         inDateRange(request.createdAt, range) &&
@@ -187,16 +197,26 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
               }}
             />
             {user.role === 'admin' ? (
-              <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={exporting || filtered.length === 0}
-                aria-busy={exporting}
-                onClick={() => void exportRows()}
-              >
-                <ArrowDownTrayIcon aria-hidden="true" />
-                {exporting ? 'Mengekspor…' : 'Ekspor Excel'}
-              </button>
+              <>
+                <Link
+                  className={styles.secondaryButton}
+                  to={link('/requests/import')}
+                  onClick={rememberScroll}
+                >
+                  <ArrowUpTrayIcon aria-hidden="true" />
+                  Impor data
+                </Link>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={exporting || filtered.length === 0}
+                  aria-busy={exporting}
+                  onClick={() => void exportRows()}
+                >
+                  <ArrowDownTrayIcon aria-hidden="true" />
+                  {exporting ? 'Mengekspor…' : 'Ekspor Excel'}
+                </button>
+              </>
             ) : (
               <Link
                 className={styles.primaryButton}
@@ -276,7 +296,10 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
                   <td className={styles.itemCell}>{request.item}</td>
                   <td>
                     <div className={styles.partyCell}>
-                      <span>{data.users.find((owner) => owner.id === request.ownerId)?.name}</span>
+                      <span>
+                        {data.users.find((owner) => owner.id === request.ownerId)?.name ??
+                          (request.ownerId ? '' : 'Data impor')}
+                      </span>
                       <small>
                         {data.research.find((item) => item.id === request.researchId)?.name}
                       </small>
@@ -373,10 +396,15 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
       {activeAction?.kind === 'delete' && selected && user.role === 'admin' && (
         <ConfirmDialog
           title="Hapus Request"
-          description={`Hapus ${selected.item} dari daftar? Data contoh ini akan diarsipkan.`}
+          description={`Hapus ${selected.item} dari daftar Pembelian Barang? Pengaju akan menerima pemberitahuan penghapusan.`}
           confirmLabel="Hapus Request"
-          onConfirm={() => {
-            deleteRequest(selected.id, selected.revision);
+          onConfirm={async () => {
+            await deleteRequestApi(selected.id, selected.revision);
+            removeRequestFromStore(selected.id);
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['requests'] }),
+              queryClient.invalidateQueries({ queryKey: ['research-types'] }),
+            ]);
             toast.success('Request berhasil dihapus.');
           }}
           onClose={close}
@@ -387,8 +415,10 @@ export function RequestList({ recent = false }: { recent?: boolean }) {
           title="Batalkan Request"
           description={`Batalkan pengajuan ${selected.item}? Tindakan ini tidak dapat dibatalkan.`}
           confirmLabel="Batalkan Request"
-          onConfirm={() => {
-            cancelRequest(selected.id, selected.revision);
+          onConfirm={async () => {
+            const updated = await cancelRequestApi(selected.id, selected.revision);
+            syncSingleRequestFromServer(updated);
+            await queryClient.invalidateQueries({ queryKey: ['requests'] });
             toast.success('Request berhasil dibatalkan.');
           }}
           onClose={close}

@@ -109,10 +109,11 @@ export function ConfirmDialog({
   title: string;
   description: string;
   confirmLabel: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onClose: () => void;
 }) {
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   return (
     <Modal title={title} onClose={onClose}>
       <p className={styles.dialogDescription}>{description}</p>
@@ -126,6 +127,7 @@ export function ConfirmDialog({
           type="button"
           className={styles.secondaryButton}
           data-initial-focus
+          disabled={isSubmitting}
           onClick={onClose}
         >
           Kembali
@@ -133,18 +135,26 @@ export function ConfirmDialog({
         <button
           type="button"
           className={styles.dangerButton}
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
           onClick={() => {
-            try {
-              onConfirm();
-              onClose();
-            } catch (cause) {
-              setError(
-                cause instanceof Error ? cause.message : 'Tindakan gagal. Silakan coba lagi.',
-              );
-            }
+            void (async () => {
+              setError('');
+              setIsSubmitting(true);
+              try {
+                await onConfirm();
+                onClose();
+              } catch (cause) {
+                setError(
+                  cause instanceof Error ? cause.message : 'Tindakan gagal. Silakan coba lagi.',
+                );
+              } finally {
+                setIsSubmitting(false);
+              }
+            })();
           }}
         >
-          {confirmLabel}
+          {isSubmitting ? 'Memproses…' : confirmLabel}
         </button>
       </div>
     </Modal>

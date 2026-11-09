@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import Decimal from 'decimal.js';
 import { useForm } from 'react-hook-form';
@@ -16,8 +17,10 @@ import {
   requestTotal,
 } from '../demo/model';
 import type { DemoRequest } from '../demo/model';
-import { canManageInvoice, loadInvoiceFile, saveInvoice } from '../demo/store';
+import { validateFile } from '../demo/file-validation';
+import { canManageInvoice, loadInvoiceFile, syncSingleRequestFromServer } from '../demo/store';
 import { useDemo } from '../demo/use-demo';
+import { saveInvoiceApi } from '../requests/api';
 import { FilePreview } from './file-preview';
 import { Field } from './shared';
 import styles from './dashboard.module.css';
@@ -25,6 +28,7 @@ const formSchema = invoiceInputSchema.extend({ url: webUrlSchema });
 type InvoiceValues = z.infer<typeof formSchema>;
 export function InvoiceContent({ request }: { request: DemoRequest }) {
   const { user } = useDemo();
+  const queryClient = useQueryClient();
   const invoice = request.invoice;
   const [editing, setEditing] = useState(!invoice);
   const [file, setFile] = useState<File | undefined>();
@@ -79,13 +83,19 @@ export function InvoiceContent({ request }: { request: DemoRequest }) {
     setBusy(true);
 
     try {
-      await saveInvoice({
-        requestId: request.id,
+      if (file) {
+        await validateFile(file, 'invoice');
+      }
+      const updated = await saveInvoiceApi(request.id, {
         file,
         ...values,
         expectedUpdatedAt: expected,
         expectedRevision,
       });
+      syncSingleRequestFromServer(updated);
+      setExpected(updated.invoice?.updatedAt ?? null);
+      setExpectedRevision(updated.revision);
+      await queryClient.invalidateQueries({ queryKey: ['requests'] });
       markSaved();
       toast.success('Invoice berhasil disimpan.');
       setEditing(false);
